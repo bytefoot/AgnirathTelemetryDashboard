@@ -4,10 +4,10 @@
     // Type definitions
     interface Cell {
         voltage: number;
-        temperature: number;
     }
 
     interface Pack {
+        temperature: number;
         cells: Cell[];
     }
 
@@ -30,9 +30,8 @@
     // Dummy data generator - comment/uncomment as needed
     function generateDummyData(): TelemetryData {
         const generateCells = (): Cell[] => {
-            return Array.from({ length: 14 }, () => ({
+            return Array.from({ length: 8 }, () => ({
                 voltage: 3.2 + Math.random() * 0.6, // Random voltage between 3.2V and 3.8V
-                temperature: 25 + Math.random() * 15 // Random temp between 25°C and 40°C
             }));
         };
 
@@ -47,6 +46,7 @@
                 temperature_range: [20, 60],
                 precharge_state: Math.random() > 0.3, // 70% chance active
                 packs: Array.from({ length: 5 }, () => ({
+                    temperature: 25 + Math.random() * 15, // Random temp between 25°C and 40°C
                     cells: generateCells()
                 }))
             }
@@ -55,8 +55,6 @@
 
     // State variables
     let data: TelemetryData = generateDummyData(); // Using dummy data
-    let selectedPack: number = 0;
-    let selectedView: 'voltage' | 'temperature' = "voltage";
 
     // Reactive statements
     $: battery = data.battery || {} as Battery;
@@ -68,31 +66,27 @@
         return `${value.toFixed(decimals)} ${unit}`;
     }
 
-    function getStatusColor(value: number | undefined, range?: [number, number], isTemperature: boolean = false): string {
-        if (typeof value !== "number") return "bg-gray-600";
+    function getVoltageStatusColor(voltage: number | undefined, range?: [number, number]): string {
+        if (typeof voltage !== "number") return "bg-gray-600";
 
-        if (isTemperature) {
-            if (value > 45) return "bg-red-500";
-            if (value > 35) return "bg-yellow-500";
-            return "bg-green-500";
-        } else {
-            // Voltage
-            const [min, max] = range || [3.0, 4.0];
-            const ratio = (value - min) / (max - min);
-            if (ratio < 0.2 || ratio > 0.9) return "bg-red-500";
-            if (ratio < 0.3 || ratio > 0.8) return "bg-yellow-500";
-            return "bg-green-500";
-        }
+        const [min, max] = range || [3.0, 4.0];
+        const ratio = (voltage - min) / (max - min);
+        if (ratio < 0.2 || ratio > 0.9) return "bg-red-500";
+        if (ratio < 0.3 || ratio > 0.8) return "bg-yellow-500";
+        return "bg-green-500";
     }
 
-    function getProgressWidth(value: number | undefined, isTemperature: boolean = false): number {
-        if (typeof value !== "number") return 0;
-        
-        if (isTemperature) {
-            return Math.min(100, Math.max(0, ((value - 20) / (60 - 20)) * 100));
-        } else {
-            return Math.min(100, Math.max(0, ((value - 3.0) / (4.0 - 3.0)) * 100));
-        }
+    function getTemperatureStatusColor(temperature: number | undefined): string {
+        if (typeof temperature !== "number") return "bg-gray-600";
+
+        if (temperature > 45) return "bg-red-500";
+        if (temperature > 35) return "bg-yellow-500";
+        return "bg-green-500";
+    }
+
+    function getVoltageProgressWidth(voltage: number | undefined): number {
+        if (typeof voltage !== "number") return 0;
+        return Math.min(100, Math.max(0, ((voltage - 3.0) / (4.0 - 3.0)) * 100));
     }
 
     // Uncomment to use real telemetry data instead of dummy data
@@ -187,92 +181,63 @@
         </div>
     </div>
 
-    <!-- Pack Selection and View Toggle -->
+    <!-- Battery Packs List View -->
     <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
-        <div
-            class="flex flex-col md:flex-row md:items-center md:justify-between mb-4"
-        >
-            <h3 class="text-lg font-semibold mb-2 md:mb-0">
-                Battery Pack Details
-            </h3>
-
-            <div class="flex flex-col sm:flex-row gap-2">
-                <!-- Pack Selection -->
-                <div class="flex space-x-1">
-                    {#each Array(5) as _, i}
-                        <button
-                            class="px-3 py-1 rounded {selectedPack === i
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}"
-                            on:click={() => (selectedPack = i)}
-                        >
-                            Pack {i + 1}
-                        </button>
-                    {/each}
-                </div>
-
-                <!-- View Toggle -->
-                <div class="flex space-x-1">
-                    <button
-                        class="px-3 py-1 rounded {selectedView === 'voltage'
-                            ? 'bg-green-600 text-white'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}"
-                        on:click={() => (selectedView = "voltage")}
-                    >
-                        Voltage
-                    </button>
-                    <button
-                        class="px-3 py-1 rounded {selectedView === 'temperature'
-                            ? 'bg-orange-600 text-white'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}"
-                        on:click={() => (selectedView = "temperature")}
-                    >
-                        Temperature
-                    </button>
-                </div>
-            </div>
+        <div class="mb-4">
+            <h3 class="text-lg font-semibold">Battery Pack Details</h3>
         </div>
 
-        <!-- Cell Grid -->
-        {#if packs[selectedPack]?.cells}
-            <div class="grid grid-cols-7 gap-3">
-                {#each packs[selectedPack].cells as cell, i}
-                    <div class="bg-gray-700 rounded p-3 text-center">
-                        <div class="text-xs text-gray-400 mb-1">
-                            Cell {i + 1}
-                        </div>
-                        <div class="text-sm font-medium mb-2">
-                            {#if selectedView === "voltage"}
-                                {formatValue(cell.voltage, "V", 3)}
-                            {:else}
-                                {formatValue(cell.temperature, "°C", 1)}
-                            {/if}
-                        </div>
-                        <div class="w-full h-2 rounded-full bg-gray-600">
-                            <div
-                                class="h-2 rounded-full {getStatusColor(
-                                    selectedView === 'voltage'
-                                        ? cell.voltage
-                                        : cell.temperature,
-                                    battery.voltage_range,
-                                    selectedView === 'temperature'
-                                )}"
-                                style="width: {getProgressWidth(
-                                    selectedView === 'voltage'
-                                        ? cell.voltage
-                                        : cell.temperature,
-                                    selectedView === 'temperature'
-                                )}%"
-                            ></div>
+        <div class="space-y-4">
+            {#each packs as pack, packIndex}
+                <div class="bg-gray-700 rounded-lg p-4 border border-gray-600">
+                    <!-- Pack Header -->
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center space-x-4">
+                            <h4 class="text-lg font-medium text-white">
+                                Pack {packIndex + 1}
+                            </h4>
+                            <div class="flex items-center space-x-2">
+                                <div
+                                    class="w-3 h-3 rounded-full {getTemperatureStatusColor(pack.temperature)}"
+                                ></div>
+                                <span class="text-sm text-gray-300">
+                                    {formatValue(pack.temperature, "°C", 1)}
+                                </span>
+                            </div>
                         </div>
                     </div>
-                {/each}
-            </div>
-        {:else}
-            <div class="text-center text-gray-400 py-8">
-                No cell data available for Pack {selectedPack + 1}
-            </div>
-        {/if}
+
+                    <!-- Cell Grid -->
+                    {#if pack.cells && pack.cells.length > 0}
+                        <div class="grid grid-cols-8 gap-3">
+                            {#each pack.cells as cell, cellIndex}
+                                <div class="bg-gray-600 rounded p-3 text-center">
+                                    <div class="text-xs text-gray-400 mb-1">
+                                        Cell {cellIndex}
+                                    </div>
+                                    <div class="text-sm font-medium mb-2">
+                                        {formatValue(cell.voltage, "V", 3)}
+                                    </div>
+                                    <div class="w-full h-2 rounded-full bg-gray-500">
+                                        <div
+                                            class="h-2 rounded-full {getVoltageStatusColor(
+                                                cell.voltage,
+                                                battery.voltage_range
+                                            )}"
+                                            style="width: {getVoltageProgressWidth(cell.voltage)}%"
+                                        ></div>
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+                    {:else}
+                        <div class="text-center text-gray-400 py-4">
+                            No cell data available for Pack {packIndex + 1}
+                        </div>
+                    {/if}
+                </div>
+            {/each}
+        </div>
 
         <!-- Legend -->
         <div class="mt-4 flex justify-center space-x-6 text-xs">
