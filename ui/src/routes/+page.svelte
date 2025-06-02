@@ -26,7 +26,7 @@
         Legend
     );
 
-    const speed_margin = $derived(Math.abs($globalStore.metric.speed - $globalStore.metric.predicted));
+    const speed_margin = $derived(Math.abs($globalStore.metric.Speed - $globalStore.metric.predicted));
     const speed_status = $derived(speed_margin > 3 ? 'error' : 'ok');
 
     // Canvas element references
@@ -59,7 +59,7 @@
         return {
             type: "line",
             data: {
-                labels: $globalStore.historic.timestamps,
+                labels: $globalStore.historic.Timestamps,
                 datasets: [
                     {
                         label: label,
@@ -122,36 +122,36 @@
     }
 
     function updateCharts(): void {
-        if ($globalStore.historic.timestamps.length === 0) return;
+        if ($globalStore.historic.Timestamps.length === 0) return;
 
         if (speedChart) {
-            speedChart.data.labels = $globalStore.historic.timestamps;
-            speedChart.data.datasets[0].data = $globalStore.historic.speed;
+            speedChart.data.labels = $globalStore.historic.Timestamps;
+            speedChart.data.datasets[0].data = $globalStore.historic.Speed;
             speedChart.update("none");
         }
 
         if (batteryChart) {
-            batteryChart.data.labels = $globalStore.historic.timestamps;
-            batteryChart.data.datasets[0].data = $globalStore.historic.battery;
+            batteryChart.data.labels = $globalStore.historic.Timestamps;
+            batteryChart.data.datasets[0].data = $globalStore.historic.Battery;
             batteryChart.update("none");
         }
 
         if (powerChart) {
-            powerChart.data.labels = $globalStore.historic.timestamps;
-            powerChart.data.datasets[0].data = $globalStore.historic.power;
+            powerChart.data.labels = $globalStore.historic.Timestamps;
+            powerChart.data.datasets[0].data = $globalStore.historic.Power;
             powerChart.update("none");
         }
 
         if (solarChart) {
-            solarChart.data.labels = $globalStore.historic.timestamps;
-            solarChart.data.datasets[0].data = $globalStore.historic.solar;
+            solarChart.data.labels = $globalStore.historic.Timestamps;
+            solarChart.data.datasets[0].data = $globalStore.historic.Solar;
             solarChart.update("none");
         }
     }
 
     // Reactive statement to update charts when history changes
     $effect(() => {
-        if ($globalStore.historic.timestamps.length > 0) {
+        if ($globalStore.historic.Timestamps.length > 0) {
             updateCharts();
         }
     });
@@ -163,7 +163,7 @@
                 speedCanvas,
                 createChartConfig(
                     "Speed",
-                    $globalStore.historic.speed,
+                    $globalStore.historic.Speed,
                     "#3b82f6",
                     "Speed (km/h)"
                 )
@@ -174,7 +174,7 @@
                 batteryCanvas,
                 createChartConfig(
                     "Battery Level",
-                    $globalStore.historic.battery,
+                    $globalStore.historic.Battery,
                     "#10b981",
                     "Battery Level (%)"
                 )
@@ -185,7 +185,7 @@
                 powerCanvas,
                 createChartConfig(
                     "Power Consumption",
-                    $globalStore.historic.power,
+                    $globalStore.historic.Power,
                     "#f59e0b",
                     "Power (W)"
                 )
@@ -196,7 +196,7 @@
                 solarCanvas,
                 createChartConfig(
                     "Solar Input",
-                    $globalStore.historic.solar,
+                    $globalStore.historic.Solar,
                     "#eab308",
                     "Solar Input (W)"
                 )
@@ -233,7 +233,7 @@
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <div class="metric-value text-blue-400">
-                        {formatValue($globalStore.metric.speed, "km/h")}
+                        {formatValue($globalStore.metric.Speed, "km/h")}
                     </div>
                     <div class="metric-label">Current Speed</div>
                 </div>
@@ -259,7 +259,7 @@
         <!-- Pack Voltage -->
         <div class="metric-card">
             <div class="metric-value text-yellow-400">
-                {formatValue($globalStore.metric.pack_voltage, "V")}
+                {formatValue($globalStore.metric.Pack_Voltage, "V")}
             </div>
             <div class="metric-label">Pack Voltage</div>
         </div>
@@ -267,7 +267,7 @@
         <!-- Battery Level -->
         <div class="metric-card">
             <div class="metric-value text-green-400">
-                {formatValue($globalStore.metric.battery_level, "%", 0)}
+                {formatValue($globalStore.metric.SOC_Ah, "%", 0)}
             </div>
             <div class="metric-label">Battery Level</div>
         </div>
@@ -298,7 +298,7 @@
 
         <div class="metric-card">
             <div class="metric-value text-orange-400">
-                {formatValue($globalStore.metric.motor_temperature, "°C")}
+                {formatValue($globalStore.metric.motor_temp, "°C")}
             </div>
             <div class="metric-label">Motor Temperature</div>
         </div>

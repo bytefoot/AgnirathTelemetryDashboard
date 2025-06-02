@@ -3,35 +3,65 @@ export interface BatteryPackData {
     cell_voltages: number[];
 }
 
+export interface MPPTData {
+    Input_Voltage: number;
+    Input_Current: number;
+    Output_Voltage: number;
+    Output_Current: number;
+    Output_Power: number;
+    efficiency: number;
+}
+
 export interface TelemetryData {
     metric: {
         // Overview
-        pack_voltage: number;
-        battery_level: number;
+        Pack_Voltage: number;
+        SOC_Ah: number;
         power_consumption: number;
         solar_input: number;
         distance_travelled: number;
-        motor_temperature: number;
+        Motor_Temp: number;
 
         // Speed
-        speed: number;
+        Speed: number;
         predicted: number;
         // margin: number;
         // status: "ok" | "error";
 
-        // Battery
-        soc: number;
-        // pack_voltage: number;
-        pack_current: number;
+        // Pack_Voltage: number;
+        Pack_Current: number;
         cmus: BatteryPackData[];
+
+        // Motor
+        Motor_Velocity: number;
+        Speed2: number;
+        HeatSink_Temp: number;
+        PhaseB_Current: number;
+        PhaseC_Current: number;
+        Bus_Voltage: number;
+        Bus_Current: number;
+        Bus_Power: number;
+
+        // Solar
+        mppts: MPPTData[];
     };
 
     historic: {
-        timestamps: string[];
-        speed: number[];
-        battery: number[];
-        power: number[];
-        solar: number[];
+        Timestamps: string[];
+        Speed: number[];
+        Battery: number[];
+        Power: number[];
+        Solar: number[];
+
+        // Motor
+        // timestamps_motor: [];
+        Bus_Power: number[];
+        Motor_Velocity: number[];
+        Speed2: number[];
+
+        // Solar
+        solar_input_voltage: number[],
+        solar_output_power: number[],
     };
 }
 
@@ -40,11 +70,18 @@ export interface UpdatePacket {
     metric: TelemetryData["metric"];
 
     historic: {
-        timestamps: string;
-        speed: number;
-        battery: number;
-        power: number;
-        solar: number;
+        Timestamps: string;
+        Speed: number;
+        Battery: number;
+        Power: number;
+        Solar: number;
+
+        Bus_Power: number;
+        Motor_Velocity: number;
+        Speed2: number;
+
+        solar_input_voltage: number,
+        solar_output_power: number,
     };
 }
 

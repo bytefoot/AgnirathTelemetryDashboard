@@ -1,31 +1,7 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
     import * as Chart from "chart.js";
-    // import { telemetryData, historicalData } from '$lib/stores/telemetry.js';
-
-    // Type definitions
-    interface Motor {
-        rpm: number;
-        velocity: number;
-        temperature: number;
-        heatsink_temp: number;
-        phase_current_b: number;
-        phase_current_c: number;
-        bus_voltage: number;
-        bus_current: number;
-        bus_power: number;
-    }
-
-    interface TelemetryData {
-        motor: Motor;
-    }
-
-    interface HistoricalData {
-        timestamps: string[];
-        buspower: number[];
-        rpm: number[];
-        speed: number[];
-    }
+    import { globalStore } from "$lib/store";
 
     // Variables
     let busPowerCanvas: HTMLCanvasElement;
@@ -34,59 +10,6 @@
     let busPowerChart: Chart.Chart;
     let rpmChart: Chart.Chart;
     let speedChart: Chart.Chart;
-
-    // Dummy data generators - comment/uncomment as needed
-    function generateDummyTelemetryData(): TelemetryData {
-        return {
-            motor: {
-                rpm: 1200 + Math.random() * 800, // 1200-2000 RPM
-                velocity: 25 + Math.random() * 15, // 25-40 km/h
-                temperature: 45 + Math.random() * 25, // 45-70°C
-                heatsink_temp: 35 + Math.random() * 20, // 35-55°C
-                phase_current_b: 15 + Math.random() * 10, // 15-25 A
-                phase_current_c: 15 + Math.random() * 10, // 15-25 A
-                bus_voltage: 46 + Math.random() * 6, // 46-52 V
-                bus_current: 8 + Math.random() * 6, // 8-14 A
-                bus_power: 300 + Math.random() * 200, // 300-500 W
-            },
-        };
-    }
-
-    function generateDummyHistoricalData(): HistoricalData {
-        const now = new Date();
-        const timestamps: string[] = [];
-        const buspower: number[] = [];
-        const rpm: number[] = [];
-        const speed: number[] = [];
-
-        // Generate 50 data points over the last 5 minutes
-        for (let i = 49; i >= 0; i--) {
-            const time = new Date(now.getTime() - i * 6000); // 6 seconds apart
-            timestamps.push(time.toISOString());
-
-            // Generate realistic trends
-            const baseRpm = 1500 + Math.sin(i * 0.1) * 300;
-            const baseSpeed = 30 + Math.sin(i * 0.1) * 8;
-            const basePower = 350 + Math.sin(i * 0.15) * 100;
-
-            rpm.push(baseRpm + (Math.random() - 0.5) * 100);
-            speed.push(baseSpeed + (Math.random() - 0.5) * 5);
-            buspower.push(basePower + (Math.random() - 0.5) * 50);
-        }
-
-        return { timestamps, buspower, rpm, speed };
-    }
-
-    // State variables with dummy data
-    let data: TelemetryData = generateDummyTelemetryData();
-    let history: HistoricalData = generateDummyHistoricalData();
-
-    // Reactive statements
-    $: motor = data.motor || ({} as Motor);
-
-    // Uncomment to use real telemetry data instead of dummy data
-    // $: data = $telemetryData;
-    // $: history = $historicalData;
 
     // Utility functions
     function formatValue(
@@ -99,51 +22,31 @@
     }
 
     function updatePlots(): void {
-        if (history.timestamps.length === 0) return;
-
-        // Format timestamps for display
-        const formattedTimestamps = history.timestamps.map((ts) => {
-            const date = new Date(ts);
-            return date.toLocaleTimeString("en-US", {
-                hour12: false,
-                minute: "2-digit",
-                second: "2-digit",
-            });
-        });
+        if ($globalStore.historic.Timestamps.length === 0) return;
 
         // Update Bus Power Chart
         if (busPowerChart) {
-            busPowerChart.data.labels = formattedTimestamps;
-            busPowerChart.data.datasets[0].data = history.buspower;
+            busPowerChart.data.labels = $globalStore.historic.Timestamps;
+            busPowerChart.data.datasets[0].data = $globalStore.historic.Bus_Power;
             busPowerChart.update("none");
         }
 
         // Update RPM Chart
         if (rpmChart) {
-            rpmChart.data.labels = formattedTimestamps;
-            rpmChart.data.datasets[0].data = history.rpm;
+            rpmChart.data.labels = $globalStore.historic.Timestamps;
+            rpmChart.data.datasets[0].data = $globalStore.historic.Motor_Velocity;
             rpmChart.update("none");
         }
 
         // Update Speed Chart
         if (speedChart) {
-            speedChart.data.labels = formattedTimestamps;
-            speedChart.data.datasets[0].data = history.speed;
+            speedChart.data.labels = $globalStore.historic.Timestamps;
+            speedChart.data.datasets[0].data = $globalStore.historic.Speed2;
             speedChart.update("none");
         }
     }
 
-    // Real-time data updates (simulating live data)
-    function simulateRealTimeUpdates(): void {
-        setInterval(() => {
-            data = generateDummyTelemetryData();
-            // Optionally update historical data too
-            const newHistory = generateDummyHistoricalData();
-            history = newHistory;
-        }, 2000); // Update every 2 seconds
-    }
-
-    $: if (history.timestamps.length > 0) {
+    $: if ($globalStore.historic.Timestamps.length > 0) {
         updatePlots();
     }
 
@@ -302,9 +205,6 @@
                 },
             });
         }
-
-        // Start real-time simulation (comment out if not needed)
-        simulateRealTimeUpdates();
     });
 
     onDestroy(() => {
@@ -341,9 +241,9 @@
     }
 
     // Reactive status calculations
-    $: motorStatus = getMotorStatus(motor.temperature || 0);
-    $: thermalStatus = getThermalStatus(motor.heatsink_temp || 0);
-    $: powerStatus = getPowerStatus(motor.bus_power || 0);
+    $: motorStatus = getMotorStatus($globalStore.metric.Motor_Temp || 0);
+    $: thermalStatus = getThermalStatus($globalStore.metric.HeatSink_Temp || 0);
+    $: powerStatus = getPowerStatus($globalStore.metric.Bus_Power || 0);
 </script>
 
 <div class="space-y-6 p-6">
@@ -351,28 +251,28 @@
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="metric-card">
             <div class="metric-value text-green-400 text-2xl">
-                {formatValue(motor.rpm, "RPM", 0)}
+                {formatValue($globalStore.metric.Motor_Velocity, "RPM", 0)}
             </div>
             <div class="metric-label">Motor RPM</div>
         </div>
 
         <div class="metric-card">
             <div class="metric-value text-blue-400 text-2xl">
-                {formatValue(motor.velocity, "km/h")}
+                {formatValue($globalStore.metric.Speed2, "km/h")}
             </div>
             <div class="metric-label">Velocity</div>
         </div>
 
         <div class="metric-card">
             <div class="metric-value text-orange-400 text-2xl">
-                {formatValue(motor.temperature, "°C")}
+                {formatValue($globalStore.metric.Motor_Temp, "°C")}
             </div>
             <div class="metric-label">Motor Temperature</div>
         </div>
 
         <div class="metric-card">
             <div class="metric-value text-cyan-400 text-2xl">
-                {formatValue(motor.heatsink_temp, "°C")}
+                {formatValue($globalStore.metric.HeatSink_Temp, "°C")}
             </div>
             <div class="metric-label">Heatsink Temperature</div>
         </div>
@@ -382,35 +282,35 @@
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div class="metric-card">
             <div class="metric-value text-purple-400">
-                {formatValue(motor.phase_current_b, "A")}
+                {formatValue($globalStore.metric.PhaseB_Current, "A")}
             </div>
             <div class="metric-label">Phase Current B</div>
         </div>
 
         <div class="metric-card">
             <div class="metric-value text-purple-400">
-                {formatValue(motor.phase_current_c, "A")}
+                {formatValue($globalStore.metric.PhaseC_Current, "A")}
             </div>
             <div class="metric-label">Phase Current C</div>
         </div>
 
         <div class="metric-card">
             <div class="metric-value text-yellow-400">
-                {formatValue(motor.bus_voltage, "V")}
+                {formatValue($globalStore.metric.Bus_Voltage, "V")}
             </div>
             <div class="metric-label">Bus Voltage</div>
         </div>
 
         <div class="metric-card">
             <div class="metric-value text-red-400">
-                {formatValue(motor.bus_current, "A")}
+                {formatValue($globalStore.metric.Bus_Current, "A")}
             </div>
             <div class="metric-label">Bus Current</div>
         </div>
 
         <div class="metric-card">
             <div class="metric-value text-orange-400">
-                {formatValue(motor.bus_power, "W", 0)}
+                {formatValue($globalStore.metric.Bus_Power, "W", 0)}
             </div>
             <div class="metric-label">Bus Power</div>
         </div>
@@ -473,7 +373,7 @@
             <div class="text-center">
                 <div class="text-2xl font-bold text-blue-400">
                     {formatValue(
-                        ((motor.velocity || 0) / (motor.rpm || 1)) * 60,
+                        (($globalStore.metric.Speed2 || 0) / ($globalStore.metric.Motor_Velocity || 1)) * 60,
                         "m/rev",
                         3
                     )}
@@ -484,7 +384,7 @@
             <div class="text-center">
                 <div class="text-2xl font-bold text-green-400">
                     {formatValue(
-                        (motor.bus_power || 0) / (motor.velocity || 1),
+                        ($globalStore.metric.Bus_Power || 0) / ($globalStore.metric.Speed2 || 1),
                         "W⋅h/km",
                         1
                     )}
@@ -495,8 +395,8 @@
             <div class="text-center">
                 <div class="text-2xl font-bold text-purple-400">
                     {formatValue(
-                        ((motor.phase_current_b || 0) +
-                            (motor.phase_current_c || 0)) /
+                        (($globalStore.metric.PhaseB_Current || 0) +
+                            ($globalStore.metric.PhaseC_Current || 0)) /
                             2,
                         "A",
                         2

@@ -12,6 +12,7 @@
         Legend,
         type ChartConfiguration,
     } from "chart.js";
+    import { globalStore } from "$lib/store";
 
     // Register Chart.js components
     Chart.register(
@@ -25,26 +26,6 @@
         Legend
     );
 
-    // TypeScript interfaces
-    interface MPPTData {
-        id: number;
-        name: string;
-        inputVoltage: number;
-        outputVoltage: number;
-        inputCurrent: number;
-        outputCurrent: number;
-        outputPower: number;
-        efficiency: number;
-        status: "ok" | "warning" | "error";
-        color: string;
-    }
-
-    interface HistoricalMPPTData {
-        timestamps: string[];
-        inputVoltage: { [key: number]: number[] };
-        outputPower: { [key: number]: number[] };
-    }
-
     // Canvas element references
     let inputVoltageCanvas: HTMLCanvasElement;
     let outputPowerCanvas: HTMLCanvasElement;
@@ -55,64 +36,6 @@
 
     // MPPT colors for charts
     const mpptColors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
-
-    // Dummy MPPT data
-    let mpptData: MPPTData[] = [
-        {
-            id: 1,
-            name: "MPPT 1",
-            inputVoltage: 24.2,
-            outputVoltage: 48.1,
-            inputCurrent: 8.5,
-            outputCurrent: 4.2,
-            outputPower: 202,
-            efficiency: 94.2,
-            status: "ok",
-            color: mpptColors[0],
-        },
-        {
-            id: 2,
-            name: "MPPT 2",
-            inputVoltage: 23.8,
-            outputVoltage: 48.0,
-            inputCurrent: 7.9,
-            outputCurrent: 3.9,
-            outputPower: 187,
-            efficiency: 93.8,
-            status: "ok",
-            color: mpptColors[1],
-        },
-        {
-            id: 3,
-            name: "MPPT 3",
-            inputVoltage: 22.1,
-            outputVoltage: 47.8,
-            inputCurrent: 6.2,
-            outputCurrent: 2.8,
-            outputPower: 134,
-            efficiency: 92.1,
-            status: "warning",
-            color: mpptColors[2],
-        },
-        {
-            id: 4,
-            name: "MPPT 4",
-            inputVoltage: 21.5,
-            outputVoltage: 47.9,
-            inputCurrent: 5.8,
-            outputCurrent: 2.6,
-            outputPower: 125,
-            efficiency: 91.4,
-            status: "ok",
-            color: mpptColors[3],
-        },
-    ];
-
-    let history: HistoricalMPPTData = {
-        timestamps: [],
-        inputVoltage: { 1: [], 2: [], 3: [], 4: [] },
-        outputPower: { 1: [], 2: [], 3: [], 4: [] },
-    };
 
     function formatValue(
         value: number | undefined,
@@ -125,82 +48,63 @@
 
     function getStatusColor(status: string): string {
         switch (status) {
-            case "ok": return "text-green-400";
-            case "warning": return "text-yellow-400";
-            case "error": return "text-red-400";
-            default: return "text-gray-400";
+            case "ok":
+                return "text-green-400";
+            case "warning":
+                return "text-yellow-400";
+            case "error":
+                return "text-red-400";
+            default:
+                return "text-gray-400";
         }
     }
 
     function getStatusBorder(status: string): string {
         switch (status) {
-            case "ok": return "border-green-500/30";
-            case "warning": return "border-yellow-500/50";
-            case "error": return "border-red-500/70";
-            default: return "border-gray-500/30";
+            case "ok":
+                return "border-green-500/30";
+            case "warning":
+                return "border-yellow-500/50";
+            case "error":
+                return "border-red-500/70";
+            default:
+                return "border-gray-500/30";
         }
     }
 
     function getStatusBg(status: string): string {
         switch (status) {
-            case "ok": return "bg-green-500/5";
-            case "warning": return "bg-yellow-500/5";
-            case "error": return "bg-red-500/5";
-            default: return "bg-gray-500/5";
+            case "ok":
+                return "bg-green-500/5";
+            case "warning":
+                return "bg-yellow-500/5";
+            case "error":
+                return "bg-red-500/5";
+            default:
+                return "bg-gray-500/5";
         }
     }
 
-    function generateHistoricalData(): void {
-        const now = new Date();
-        const timestamps: string[] = [];
-        const inputVoltageData: { [key: number]: number[] } = { 1: [], 2: [], 3: [], 4: [] };
-        const outputPowerData: { [key: number]: number[] } = { 1: [], 2: [], 3: [], 4: [] };
-
-        for (let i = 59; i >= 0; i--) {
-            const time = new Date(now.getTime() - i * 60000);
-            timestamps.push(time.toLocaleTimeString());
-
-            // Generate data for each MPPT
-            mpptData.forEach((mppt) => {
-                const baseVoltage = 20 + mppt.id * 2;
-                const basePower = 100 + mppt.id * 50;
-                
-                inputVoltageData[mppt.id].push(
-                    baseVoltage + Math.sin(i / 10) * 3 + Math.random() * 2
-                );
-                outputPowerData[mppt.id].push(
-                    basePower + Math.sin(i / 8) * 30 + Math.random() * 20
-                );
-            });
-        }
-
-        history = {
-            timestamps,
-            inputVoltage: inputVoltageData,
-            outputPower: outputPowerData,
-        };
-    }
-
-    function createMultiLineChartConfig(
+    function createSingleLineChartConfig(
         title: string,
         yAxisLabel: string,
-        dataType: "inputVoltage" | "outputPower"
+        dataType: "solar_input_voltage" | "solar_output_power"
     ): ChartConfiguration {
-        const datasets = mpptData.map((mppt) => ({
-            label: mppt.name,
-            data: history[dataType][mppt.id],
-            borderColor: mppt.color,
-            backgroundColor: mppt.color + "20",
-            borderWidth: 2,
-            fill: false,
-            tension: 0.1,
-        }));
-
         return {
             type: "line",
             data: {
-                labels: history.timestamps,
-                datasets: datasets,
+                labels: $globalStore.historic.Timestamps,
+                datasets: [
+                    {
+                        label: title, // You can change this to "Net" or another label
+                        data: $globalStore.historic[dataType],
+                        borderColor: "#3b82f6", // Blue color (tailwind-like)
+                        backgroundColor: "#3b82f620", // Blue with 20% opacity
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.1,
+                    },
+                ],
             },
             options: {
                 responsive: true,
@@ -217,7 +121,7 @@
                             color: "#fff",
                         },
                         grid: {
-                            color: "#374151",
+                            color: "#374151", // Gray grid lines
                         },
                     },
                     x: {
@@ -251,81 +155,45 @@
     }
 
     function updateCharts(): void {
-        if (history.timestamps.length === 0) return;
+        if ($globalStore.historic.Timestamps.length === 0) return;
 
         if (inputVoltageChart) {
-            inputVoltageChart.data.labels = history.timestamps;
-            mpptData.forEach((mppt, index) => {
-                inputVoltageChart.data.datasets[index].data = history.inputVoltage[mppt.id];
-            });
+            inputVoltageChart.data.labels = $globalStore.historic.Timestamps;
+            inputVoltageChart.data.datasets[0].data =
+                $globalStore.historic.solar_input_voltage;
             inputVoltageChart.update("none");
         }
 
         if (outputPowerChart) {
-            outputPowerChart.data.labels = history.timestamps;
-            mpptData.forEach((mppt, index) => {
-                outputPowerChart.data.datasets[index].data = history.outputPower[mppt.id];
-            });
+            outputPowerChart.data.labels = $globalStore.historic.Timestamps;
+            outputPowerChart.data.datasets[0].data =
+                $globalStore.historic.solar_output_power;
             outputPowerChart.update("none");
         }
     }
 
-    function updateLiveData(): void {
-        // Update MPPT data
-        mpptData = mpptData.map((mppt) => ({
-            ...mppt,
-            inputVoltage: mppt.inputVoltage + (Math.random() - 0.5) * 0.5,
-            outputVoltage: mppt.outputVoltage + (Math.random() - 0.5) * 0.2,
-            inputCurrent: mppt.inputCurrent + (Math.random() - 0.5) * 0.3,
-            outputCurrent: mppt.outputCurrent + (Math.random() - 0.5) * 0.2,
-            outputPower: mppt.outputPower + (Math.random() - 0.5) * 10,
-            efficiency: Math.max(85, Math.min(98, mppt.efficiency + (Math.random() - 0.5) * 0.5)),
-        }));
-
-        // Add new data points to history
-        const newTimestamp = new Date().toLocaleTimeString();
-        const newInputVoltage: { [key: number]: number[] } = { 1: [], 2: [], 3: [], 4: [] };
-        const newOutputPower: { [key: number]: number[] } = { 1: [], 2: [], 3: [], 4: [] };
-
-        mpptData.forEach((mppt) => {
-            newInputVoltage[mppt.id] = [
-                ...history.inputVoltage[mppt.id].slice(-59),
-                mppt.inputVoltage,
-            ];
-            newOutputPower[mppt.id] = [
-                ...history.outputPower[mppt.id].slice(-59),
-                mppt.outputPower,
-            ];
-        });
-
-        history = {
-            timestamps: [...history.timestamps.slice(-59), newTimestamp],
-            inputVoltage: newInputVoltage,
-            outputPower: newOutputPower,
-        };
-    }
-
     // Reactive statement to update charts when history changes
-    $: if (history.timestamps.length > 0) {
-        updateCharts();
-    }
+    $effect(() => {
+        if ($globalStore.historic.Timestamps.length > 0) {
+            updateCharts();
+        }
+    });
 
     // Calculate totals for summary
-    $: totalPower = mpptData.reduce((sum, mppt) => sum + mppt.outputPower, 0);
-    $: avgEfficiency = mpptData.reduce((sum, mppt) => sum + mppt.efficiency, 0) / mpptData.length;
-    $: activeUnits = mpptData.filter(mppt => mppt.status === 'ok').length;
+    const totalPower = $derived($globalStore.metric.mppts.reduce((sum, mppt) => sum + mppt.Output_Power, 0));
+    const avgEfficiency = $derived($globalStore.metric.mppts.reduce((sum, mppt) => sum + mppt.efficiency, 0) / $globalStore.metric.mppts.length);
+    // $: avgEfficiency = mpptData.reduce((sum, mppt) => sum + mppt.efficiency, 0) / mpptData.length;
+    // $: activeUnits = mpptData.filter(mppt => mppt.status === 'ok').length;
 
     onMount(() => {
-        generateHistoricalData();
-
         // Create charts
         if (inputVoltageCanvas) {
             inputVoltageChart = new Chart(
                 inputVoltageCanvas,
-                createMultiLineChartConfig(
+                createSingleLineChartConfig(
                     "MPPT Input Voltage vs Time",
                     "Input Voltage (V)",
-                    "inputVoltage"
+                    "solar_input_voltage"
                 )
             );
         }
@@ -333,19 +201,15 @@
         if (outputPowerCanvas) {
             outputPowerChart = new Chart(
                 outputPowerCanvas,
-                createMultiLineChartConfig(
+                createSingleLineChartConfig(
                     "MPPT Output Power vs Time",
                     "Output Power (W)",
-                    "outputPower"
+                    "solar_output_power"
                 )
             );
         }
 
-        // Set up live data updates
-        const interval = setInterval(updateLiveData, 3000);
-
         return () => {
-            clearInterval(interval);
             // Cleanup charts
             inputVoltageChart?.destroy();
             outputPowerChart?.destroy();
@@ -361,9 +225,12 @@
             <div class="summary-header">
                 <h2 class="summary-title">☀️ Solar Array Status</h2>
                 <div class="status-indicators">
-                    {#each mpptData as mppt}
-                        <div class="status-dot {mppt.status === 'ok' ? 'dot-ok' : mppt.status === 'warning' ? 'dot-warning' : 'dot-error'}" 
-                             style="background-color: {mppt.color}"></div>
+                    {#each $globalStore.metric.mppts as mppt, mpptIndex}
+                        <!-- <div class="status-dot {mppt.status === 'ok' ? 'dot-ok' : mppt.status === 'warning' ? 'dot-warning' : 'dot-error'}"  -->
+                        <div
+                            class="status-dot {'dot-ok'}"
+                            style="background-color: {mpptColors[mpptIndex]}"
+                        ></div>
                     {/each}
                 </div>
             </div>
@@ -377,7 +244,7 @@
                     <div class="stat-label">Avg Efficiency</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value text-blue-400">{activeUnits}/4</div>
+                    <div class="stat-value text-blue-400">N/A</div>
                     <div class="stat-label">Active Units</div>
                 </div>
             </div>
@@ -385,19 +252,37 @@
 
         <!-- MPPT Units Grid -->
         <div class="mppt-grid">
-            {#each mpptData as mppt}
-                <div class="mppt-card-modern {getStatusBorder(mppt.status)} {getStatusBg(mppt.status)}">
+            {#each $globalStore.metric.mppts as mppt, mpptIndex}
+                <div
+                    class="mppt-card-modern {getStatusBorder(
+                        'ok'
+                    )} {getStatusBg('ok')}"
+                >
                     <!-- MPPT Header -->
                     <div class="mppt-header">
                         <div class="mppt-title-section">
-                            <h3 class="mppt-name" style="color: {mppt.color}">{mppt.name}</h3>
+                            <h3
+                                class="mppt-name"
+                                style="color: {mpptColors[mpptIndex]}"
+                            >
+                                {"MPPT " + mpptIndex.toString()}
+                            </h3>
                             <div class="power-display">
-                                <span class="power-value text-yellow-400">{formatValue(mppt.outputPower, '', 0)}</span>
+                                <span class="power-value text-yellow-400"
+                                    >{formatValue(
+                                        mppt.Output_Power,
+                                        "",
+                                        0
+                                    )}</span
+                                >
                                 <span class="power-unit">W</span>
                             </div>
                         </div>
-                        <div class="efficiency-circle {mppt.status === 'ok' ? 'circle-ok' : mppt.status === 'warning' ? 'circle-warning' : 'circle-error'}">
-                            <span class="efficiency-text">{formatValue(mppt.efficiency, '', 1)}%</span>
+                        <!-- <div class="efficiency-circle {mppt.status === 'ok' ? 'circle-ok' : mppt.status === 'warning' ? 'circle-warning' : 'circle-error'}"> -->
+                        <div class="efficiency-circle circle-ok">
+                            <span class="efficiency-text"
+                                >{formatValue(mppt.efficiency, "", 1)}%</span
+                            >
                         </div>
                     </div>
 
@@ -409,14 +294,24 @@
                             <div class="metric-row">
                                 <span class="metric-icon">⚡</span>
                                 <div class="metric-data">
-                                    <span class="metric-value text-blue-400">{formatValue(mppt.inputVoltage, '')}</span>
+                                    <span class="metric-value text-blue-400"
+                                        >{formatValue(
+                                            mppt.Input_Voltage,
+                                            ""
+                                        )}</span
+                                    >
                                     <span class="metric-unit">V</span>
                                 </div>
                             </div>
                             <div class="metric-row">
                                 <span class="metric-icon">🔌</span>
                                 <div class="metric-data">
-                                    <span class="metric-value text-cyan-400">{formatValue(mppt.inputCurrent, '')}</span>
+                                    <span class="metric-value text-cyan-400"
+                                        >{formatValue(
+                                            mppt.Input_Current,
+                                            ""
+                                        )}</span
+                                    >
                                     <span class="metric-unit">A</span>
                                 </div>
                             </div>
@@ -428,14 +323,24 @@
                             <div class="metric-row">
                                 <span class="metric-icon">⚡</span>
                                 <div class="metric-data">
-                                    <span class="metric-value text-green-400">{formatValue(mppt.outputVoltage, '')}</span>
+                                    <span class="metric-value text-green-400"
+                                        >{formatValue(
+                                            mppt.Output_Voltage,
+                                            ""
+                                        )}</span
+                                    >
                                     <span class="metric-unit">V</span>
                                 </div>
                             </div>
                             <div class="metric-row">
                                 <span class="metric-icon">🔌</span>
                                 <div class="metric-data">
-                                    <span class="metric-value text-emerald-400">{formatValue(mppt.outputCurrent, '')}</span>
+                                    <span class="metric-value text-emerald-400"
+                                        >{formatValue(
+                                            mppt.Output_Current,
+                                            ""
+                                        )}</span
+                                    >
                                     <span class="metric-unit">A</span>
                                 </div>
                             </div>
@@ -444,10 +349,18 @@
 
                     <!-- Status Bar -->
                     <div class="status-bar">
-                        <div class="status-indicator-bar {mppt.status === 'ok' ? 'bar-ok' : mppt.status === 'warning' ? 'bar-warning' : 'bar-error'}">
-                            <div class="status-fill" style="width: {mppt.efficiency}%; background: linear-gradient(90deg, {mppt.color}40, {mppt.color})"></div>
+                        <!-- <div class="status-indicator-bar {mppt.status === 'ok' ? 'bar-ok' : mppt.status === 'warning' ? 'bar-warning' : 'bar-error'}"> -->
+                        <div class="status-indicator-bar bar-ok">
+                            <div
+                                class="status-fill"
+                                style="width: {mppt.efficiency}%; background: linear-gradient(90deg, {mpptColors[
+                                    mpptIndex
+                                ]}40, {mpptColors[mpptIndex]})"
+                            ></div>
                         </div>
-                        <span class="status-text {getStatusColor(mppt.status)}">{mppt.status.toUpperCase()}</span>
+                        <span class="status-text {getStatusColor('ok')}"
+                            >{"OK".toUpperCase()}</span
+                        >
                     </div>
                 </div>
             {/each}
@@ -457,7 +370,8 @@
     <!-- Charts Section -->
     <div class="charts-section">
         <div class="chart-container">
-            <canvas bind:this={inputVoltageCanvas} class="chart-canvas"></canvas>
+            <canvas bind:this={inputVoltageCanvas} class="chart-canvas"
+            ></canvas>
         </div>
 
         <div class="chart-container">
@@ -466,7 +380,7 @@
     </div>
 </div>
 
-<style lang='postcss'>
+<style lang="postcss">
     @reference "tailwindcss";
 
     .dashboard-container {
@@ -498,7 +412,8 @@
         animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 
-    .status-dot.dot-warning, .status-dot.dot-error {
+    .status-dot.dot-warning,
+    .status-dot.dot-error {
         animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 
@@ -635,7 +550,7 @@
         .mppt-grid {
             @apply grid-cols-1;
         }
-        
+
         .charts-section {
             @apply grid-cols-1;
         }
@@ -650,11 +565,12 @@
     }
 
     @keyframes pulse {
-        0%, 100% {
+        0%,
+        100% {
             opacity: 1;
         }
         50% {
-            opacity: .5;
+            opacity: 0.5;
         }
     }
 </style>

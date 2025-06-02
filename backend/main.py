@@ -5,37 +5,59 @@ import json
 import time
 import math
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uvicorn
 from contextlib import asynccontextmanager
+import threading
+import traceback 
+
+from downlink import main as run_downlink
 
 # Global state to store current data
 current_data = {
     "metric": {
-        'pack_voltage': 48.2,
-        'battery_level': 87.0,
+        'Pack_Voltage': 48.2,
+        'SOC_Ah': 12000,
         'power_consumption': 1250.0,
         'solar_input': 450.0,
         'distance_travelled': 142.8,
-        'motor_temperature': 68.5,
-        'speed': 65.4,
+        'Motor_Temp': 68.5,
+        'Speed': 65.4,
         'predicted': 67.2,
 
-        'soc': 12000,
-        'pack_current': 46.26,
-        'cmus': [{'temperature': 30.12, 'cell_voltages': [3.7 for _ in range(8)]} for _ in range(5)]
+        'Pack_Current': 46.26,
+        'cmus': [{'temperature': 30.12, 'cell_voltages': [3.7 for _ in range(8)]} for _ in range(5)],
+
+        'Motor_Velocity': 123,
+        'Speed2': 75,
+        'HeatSink_Temp': 31,
+        'PhaseB_Current': 45.6,
+        'PhaseC_Current': 45.7,
+        'Bus_Voltage': 50,
+        'Bus_Current': 45,
+        'Bus_Power': 50 * 45,
+
+        'mppts': [{
+            'Input_Voltage': 50,
+            'Input_Current': 45,
+            'Output_Voltage': 50,
+            'Output_Current': 45,
+            'Output_Power': 50 * 45,
+            'efficiency': 98,
+        } for _ in range(4)],
     },
     "historic": {
-        'timestamps': [],
-        'speed': [],
-        'battery': [],
-        'power': [],
-        'solar': []
+        'Timestamps': [],
+        'Speed': [],
+        'Battery': [],
+        'Power': [],
+        'Solar': [],
+        'Bus_Power': [],
+        'Motor_Velocity': [],
+        'Speed2': [],
+        'solar_input_voltage': [],
+        'solar_output_power': [],
     }
-}
-
-update_packet = {
-    'type': 'update',
 }
 
 # WebSocket connection manager
@@ -64,136 +86,148 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-def generate_historical_data():
-    """Generate initial historical data for the past hour"""
-    now = datetime.now()
-    timestamps = []
-    speed_data = []
-    battery_data = []
-    power_data = []
-    solar_data = []
-
-    for i in range(59, -1, -1):  # 60 points, going backwards
-        time_point = now - timedelta(seconds=i)
-        timestamps.append(time_point.strftime("%H:%M:%S"))
-        
-        # Generate realistic telemetry data
-        speed_data.append(60 + math.sin(i / 10) * 15 + random.uniform(-2.5, 2.5))
-        battery_data.append(max(20, 90 - i * 0.8 + random.uniform(-1.5, 1.5)))
-        power_data.append(1000 + math.sin(i / 8) * 400 + random.uniform(-50, 50))
-        solar_data.append(max(0, 400 + math.sin(i / 12) * 200 + random.uniform(-25, 25)))
-
-    current_data["historic"] = {
-        'timestamps': timestamps,
-        'speed': speed_data,
-        'battery': battery_data,
-        'power': power_data,
-        'solar': solar_data
-    }
-
-# Event-driven data update system
-data_update_event = asyncio.Event()
-
-async def broadcast_data_update():
-    """Broadcast current data to all WebSocket clients when triggered"""
-    # data = {
-    #     'metric': current_data["metric"],
-    #     "history": current_data["history"]
-    # }
-    print("broadcasting")
-    await manager.broadcast(json.dumps(update_packet))
-
-def trigger_data_broadcast():
-    """Trigger a broadcast - call this when new serial data arrives"""
-    if hasattr(trigger_data_broadcast, '_loop'):
-        loop = trigger_data_broadcast._loop
-        if loop.is_running():
-            # This ensures the event gets set in the correct event loop
-            loop.call_soon_threadsafe(data_update_event.set)
-
-async def background_broadcaster():
+async def update_processor(queue: asyncio.Queue):
     """Background task that waits for data update events and broadcasts"""
-    while True:
-        await data_update_event.wait()  # Wait for data update signal
-        try:
-            await broadcast_data_update()
-        finally:
-            data_update_event.clear()  # Reset the event AFTER broadcasting
-
-# Serial data processing functions
-def update_telemetry_from_serial(serial_data: dict):
-    """Update telemetry data from serial input and trigger broadcast"""
     try:
-        current_data['metric'].update(serial_data['metric'])
-        
-        for k in current_data['historic']:
-            if k in serial_data['historic']:
-                current_data['historic'][k].append(serial_data['historic'][k])
+        while True:
+            (ptype, pdata) = await queue.get()
+            # await asyncio.sleep(1)
 
-        update_packet.update(serial_data)
-        # Trigger broadcast to all WebSocket clients
-        # data_update_event.set()``
-        trigger_data_broadcast()
-        
+            # ptype = 'A'
+            # pdata = {
+            #     "Timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S"),
+            #     "SOC_Ah": round(random.uniform(0, 200)),  # State of Charge in Ah (0-200Ah range)
+            #     "Pack_Voltage": round(random.uniform(300, 800)),  # High voltage battery pack
+            #     "Pack_Current": round(random.uniform(-200, 200)),  # Can be negative (charging)
+            #     "Bus_Voltage": round(random.uniform(300, 800)),
+            #     "Bus_Current": round(random.uniform(-200, 200)),
+            #     "Motor_Velocity": round(random.uniform(0, 8000)),  # RPM
+            #     "Vehicle_Velocity": round(random.uniform(0, 120)),  # km/h
+            #     "PhaseC_Current": round(random.uniform(-150, 150)),
+            #     "PhaseB_Current": round(random.uniform(-150, 150)),
+            #     "Input_Voltage_A": round(random.uniform(10, 15)),
+            #     "Input_Current_A": round(random.uniform(0, 30)),
+            #     "Output_Voltage_A": round(random.uniform(10, 15)),
+            #     "Output_Current_A": round(random.uniform(0, 30)),
+            #     "Input_Voltage_B": round(random.uniform(10, 15)),
+            #     "Input_Current_B": round(random.uniform(0, 30)),
+            #     "Output_Voltage_B": round(random.uniform(10, 15)),
+            #     "Output_Current_B": round(random.uniform(0, 30)),
+            #     "Input_Voltage_C": round(random.uniform(10, 15)),
+            #     "Input_Current_C": round(random.uniform(0, 30)),
+            #     "Output_Voltage_C": round(random.uniform(10, 15)),
+            #     "Output_Current_C": round(random.uniform(0, 30)),
+            #     "Input_Voltage_D": round(random.uniform(10, 15)),
+            #     "Input_Current_D": round(random.uniform(0, 30)),
+            #     "Output_Voltage_D": round(random.uniform(10, 15)),
+            #     "Output_Current_D": round(random.uniform(0, 30)),
+            #     "Latitude": round(random.uniform(-90, 90), 6),
+            #     "Longitude": round(random.uniform(-180, 180), 6),
+            #     "Altitude": round(random.uniform(-100, 3000)),  # Meters
+            #     "Speed": round(random.uniform(0, 120)),  # km/h
+            #     "acc_X": round(random.uniform(-2, 2)),  # m/s²
+            #     "acc_Y": round(random.uniform(-2, 2)),
+            #     "acc_Z": round(random.uniform(-2, 2)),
+            #     "Flags": []  # Dictionary of boolean flags
+            # }
+
+            update_packet = {"type": "update"}
+
+            if ptype == "A":
+                metric = {}
+
+                # Direct data
+                for k in ["SOC_Ah", "Pack_Voltage", "Pack_Current", "Bus_Voltage",
+                        "Bus_Current", "Motor_Velocity", "PhaseC_Current",
+                        "PhaseB_Current", "Speed"]:
+                    metric[k] = pdata[k]
+                
+                # Direct data - reorganised
+                metric['mppts'] = []
+                solar_o = 0
+                solar_i_v = 0
+                for i in ['A', 'B', 'C', 'D']:
+                    d = {k: pdata[k + f"_{i}"]
+                        for k in ["Input_Voltage", f"Input_Current",
+                        "Output_Voltage", f"Output_Current"]}
+                    
+                    d['Output_Power'] = ds_o = d['Output_Voltage'] * d['Output_Current']
+                    solar_o +=  ds_o
+                    solar_i_v += d['Input_Voltage']
+            
+                    d['efficiency'] = ds_o / max(d['Input_Voltage'] * d['Input_Current'], 0.00001)
+                    metric['mppts'].append(d)
+                solar_i_v /= 4
+
+                # Derived data
+                metric['power_consumption'] = output_power = pdata['Bus_Voltage'] * pdata['Bus_Current']
+                metric['Speed2'] = pdata['Vehicle_Velocity']
+                metric['solar_input'] = solar_o
+
+                historic = {
+                    'Timestamps': pdata['Timestamp'],
+                    'Speed': pdata['Speed'],
+                    'Battery': pdata['SOC_Ah'],
+                    'Power': output_power,
+                    'Solar': solar_o,
+                    'Bus_Power': output_power,
+                    'Motor_Velocity': pdata['Motor_Velocity'],
+                    'Speed2': pdata['Vehicle_Velocity'],
+
+                    'solar_input_voltage': solar_i_v,
+                    'solar_output_power': solar_o,
+                }
+
+                for k in current_data['historic']:
+                    if k in historic:
+                        current_data['historic'][k].append(historic[k])
+
+                update_packet['metric'] = metric
+                update_packet['historic'] = historic
+            
+            if ptype == 'B':
+                metric = {}
+
+                metric['cmus'] = []
+                output_power = 0
+                for i in range(1, 6):
+                    d = {"temperature": pdata[f"CMU{i}_Temp"]}
+                    d['cell_voltages'] = [pdata[f"CMU{i}_Cell{j}_Voltage"] for j in range(8)]
+                    metric['cmus'].append(d)
+                
+                update_packet['metric'] = metric
+
+            # Broadcast update =====================================
+            print("broadcasting")
+            await manager.broadcast(json.dumps(update_packet))
+    
     except Exception as e:
-        print(f"Error updating telemetry from serial: {e}")
-
-# Demo function to simulate serial data updates (remove in production)
-async def simulate_serial_updates():
-    """Simulate serial data updates - remove this in production"""
-    while True:
-        await asyncio.sleep(1)  # Wait 5 seconds between updates
-        # Simulate receiving serial data
-        simulated_serial_data = {
-            'metric': {
-                'pack_voltage': 48.2 + random.uniform(-0.5, 0.5),
-                'battery_level': max(0, current_data['metric']['battery_level'] - random.uniform(0.05, 0.15)),
-                'power_consumption': 1250 + random.uniform(-100, 100),
-                'solar_input': max(0, 450 + random.uniform(-50, 50)),
-                'distance_travelled': current_data["metric"]['distance_travelled'] + random.uniform(0.08, 0.12),
-                'motor_temperature': 68.5 + random.uniform(-2, 2),
-                'speed': 65 + random.uniform(-5, 5),
-                'predicted': 67 + random.uniform(-3, 3),
-
-                'soc': 12000 + random.uniform(-3, 3),
-                'pack_current': 46 + random.gauss(0, 4),
-                'cmus': [{'temperature': 30 + random.gauss(0, 1.5), 'cell_voltages': [3.7 + random.gauss(0, 0.45) for _ in range(8)]} for _ in range(5)]
-            },
-            'historic': {
-                'timestamps': datetime.now().strftime("%H:%M:%S"),
-                'speed': 60 + math.sin(time.time() / 100) * 15 + random.uniform(-2.5, 2.5),
-                'battery': max(0, current_data["historic"]['battery'][-1] - 2) if current_data["historic"]['battery'] else 85,
-                'power': 1000 + math.sin(time.time() / 80) * 400 + random.uniform(-50, 50),
-                'solar': max(0, 400 + math.sin(time.time() / 120) * 200 + random.uniform(-25, 25))
-            }
-        }
-
-        update_telemetry_from_serial(simulated_serial_data)
+        print(f"PRocessor crashed: {e}")
+        traceback.print_exc()
+        raise
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize data and start background tasks"""
-    generate_historical_data()
+    
+    queue = asyncio.Queue()
+
     # Store the event loop for cross-thread communication
-    trigger_data_broadcast._loop = asyncio.get_event_loop()
-    # Start the background broadcaster task
-    t1 = asyncio.create_task(background_broadcaster())
-    # Start demo serial simulation (remove in production)
-    t2 = asyncio.create_task(simulate_serial_updates())
+    loop = asyncio.get_event_loop()
+    t1 = asyncio.create_task(update_processor(queue))
 
-    app.state.background_tasks = set()
-    app.state.background_tasks.add(t1)
-    app.state.background_tasks.add(t2)
-
-    t1.add_done_callback(app.state.background_tasks.discard)
-    t2.add_done_callback(app.state.background_tasks.discard)
+    thread =  threading.Thread(
+        target=run_downlink,
+        args=(queue, loop),
+        daemon=True
+    )
+    thread.start()
 
     yield
 
-    for task in app.state.background_tasks:
-        task.cancel()
-    await asyncio.gather(*app.state.background_tasks, return_exceptions=True)
+    t1.cancel()
 
+    # Cancel thread somehow
     return
 
 app = FastAPI(title="Telemetry Dashboard API", lifespan=lifespan)

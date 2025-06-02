@@ -5,30 +5,60 @@ import type {DataPacket, TelemetryData, UpdatePacket, BatteryPackData} from "$li
 const initialState: TelemetryData = {
     metric: {
         // Overview
-        pack_voltage: 0,
-        battery_level: 0,
+        Pack_Voltage: 0,
+        SOC_Ah: 0,
         power_consumption: 0,
         solar_input: 0,
         distance_travelled: 0,
-        motor_temperature: 0,
+        Motor_Temp: 0,
 
         // Speed
-        speed: 0,
+        Speed: 0,
         predicted: 0,
 
-        pack_current: 0,
-        soc: 0,
+        // Battery
+        Pack_Current: 0,
         cmus: Array.from({ length: 5 }, () => ({
             temperature: 0,
             cell_voltages: Array.from({ length: 8 }, () => 0)
-        }))
+        })),
+
+        // Motor
+        Motor_Velocity: 0,
+        Speed2: 0,
+        HeatSink_Temp: 0,
+        PhaseB_Current: 0,
+        PhaseC_Current: 0,
+        Bus_Voltage: 0,
+        Bus_Current: 0,
+        Bus_Power: 0,
+
+        // Solar
+        mppts: Array.from({ length: 4 }, () => ({
+            Input_Voltage: 0,
+            Input_Current: 0,
+            Output_Voltage: 0,
+            Output_Current: 0,
+            Output_Power: 0,
+            efficiency: 0,
+        })),
     },
     historic: {
-        timestamps: [],
-        speed: [],
-        battery: [],
-        power: [],
-        solar: [],
+        Timestamps: [],
+        Speed: [],
+        Battery: [],
+        Power: [],
+        Solar: [],
+
+        // Motor
+        // timestamps_motor: [];
+        Bus_Power: [],
+        Motor_Velocity: [],
+        Speed2: [],
+        
+        // Solar
+        solar_input_voltage: [],
+        solar_output_power: [],
     }
 };
 

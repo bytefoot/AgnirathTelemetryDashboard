@@ -181,3 +181,5 @@ public/
 
 # MacOs
 .DS_Store
+
+output_data1.jsonl

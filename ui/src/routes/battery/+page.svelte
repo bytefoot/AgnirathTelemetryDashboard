@@ -40,7 +40,7 @@
     <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div class="metric-card col-span-1 md:col-span-2">
             <div class="metric-value text-green-400 text-3xl">
-                {formatValue($globalStore.metric.soc, "Ah", 0)}
+                {formatValue($globalStore.metric.SOC_Ah, "Ah", 0)}
             </div>
             <div class="metric-label">State of Charge</div>
             <div class="mt-2 bg-gray-700 rounded-full h-2">
@@ -54,14 +54,14 @@
 
         <div class="metric-card">
             <div class="metric-value text-yellow-400">
-                {formatValue($globalStore.metric.pack_voltage, "V")}
+                {formatValue($globalStore.metric.Pack_Voltage, "V")}
             </div>
             <div class="metric-label">Pack Voltage</div>
         </div>
 
         <div class="metric-card">
             <div class="metric-value text-blue-400">
-                {formatValue($globalStore.metric.pack_current, "A")}
+                {formatValue($globalStore.metric.Pack_Current, "A")}
             </div>
             <div class="metric-label">Pack Current</div>
         </div>

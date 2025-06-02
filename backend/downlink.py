@@ -4,10 +4,11 @@ import os
 import numpy as np
 
 
-SERIAL_PORT = "/dev/ttyUSB1"
+# SERIAL_PORT = "/dev/ttyUSB1"
+SERIAL_PORT = "/dev/tty.usbserial-0001"
 BAUD_RATE = 115200
 TIMEOUT = 1
-TERMINATOR = b'\xDE\xAD\xBE\xEF'  ## same terminator as sender ##
+HEADER = b'\xDE\xAD\xBE\xEF'  ## same HEADER as sender ##
 
 
 def generate_crc(byte_stream: bytes, poly=0x1021, init_val=0x0000):
@@ -30,6 +31,12 @@ def flush_serial(ser):
 
 
 def read_packet(ser: serial.Serial):
+    head_bytes = ser.read(len(HEADER))
+    if head_bytes != HEADER:
+        # print("header mismatch, dropping packet")
+        flush_serial(ser)
+        return None
+
     length_bytes = ser.read(2)
     if len(length_bytes) < 2:
         return None  # timeout or incomplete
@@ -46,12 +53,6 @@ def read_packet(ser: serial.Serial):
 
     data_bytes = ser.read(length)
     if len(data_bytes) < length:
-        return None
-
-    term_bytes = ser.read(len(TERMINATOR))
-    if term_bytes != TERMINATOR:
-        print("Terminator mismatch, dropping packet")
-        flush_serial(ser)
         return None
 
     calc_crc = generate_crc(type_byte + data_bytes)
@@ -78,6 +79,7 @@ def unpack_flags(flag_bytes: bytes, total_bits: int, flags_list: list[str]) -> d
         flag_values[flag_key] = bits[i]
     return flag_values
 
+
 def reverse_bytestream(data_bytes: bytes, output_order: list[str], fields: dict, flags: list[str], type_map: dict):
     data_buf = {}
     idx = 0
@@ -103,12 +105,12 @@ def reverse_bytestream(data_bytes: bytes, output_order: list[str], fields: dict,
 
             # Convert bytes back to numpy value
             value = np.frombuffer(val_bytes, dtype=dtype)[0]
-            data_buf[key] = value
+            data_buf[key] = value.item()
 
     return data_buf
 
 
-def log_data(data_buf, filename="output_data.jsonl"):
+def log_data(data_buf, filename="output_data1.jsonl"):
     # Convert numpy scalars to Python native types ####################### temp fix #####TODO: fix this
     clean_data = {k: (v.item() if hasattr(v, 'item') else v) for k, v in data_buf.items()}
     with open(filename, "a") as f:
@@ -116,8 +118,7 @@ def log_data(data_buf, filename="output_data.jsonl"):
         f.write(json_line + "\n")
 
 
-
-def main():
+def main(queue, loop):
     ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=TIMEOUT)
 
     current_dir = os.path.dirname(__file__)
@@ -153,6 +154,8 @@ def main():
         data_buf = reverse_bytestream(packet['data'], output_order, fields, flags, type_map)
         log_data(data_buf)
         print("logged data!!")
+
+        loop.call_soon_threadsafe(queue.put_nowait, (packet['type'], data_buf))
 
 
 if __name__ == "__main__":
