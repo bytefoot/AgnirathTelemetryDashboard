@@ -2,6 +2,7 @@
     import { onMount, onDestroy } from "svelte";
     import * as Chart from "chart.js";
     import { globalStore } from "$lib/store";
+    import type { TelemetryData } from '$lib/store_types';
 
     // Variables
     let busPowerCanvas: HTMLCanvasElement;
@@ -19,6 +20,77 @@
     ): string {
         if (typeof value !== "number") return "N/A";
         return `${value.toFixed(decimals)} ${unit}`;
+    }
+
+    function createChartConfig(
+        label: string,
+        data: number[],
+        color: string,
+        yAxisLabel: string
+    ): Chart.ChartConfiguration {
+        return {
+            type: "line",
+            data: {
+                labels: $globalStore.historic.Timestamps,
+                datasets: [
+                    {
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: color + "20",
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.1,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: label === "Battery Level",
+                        max: label === "Battery Level" ? 100 : undefined,
+                        title: {
+                            display: true,
+                            text: yAxisLabel,
+                            color: "#fff",
+                        },
+                        ticks: {
+                            color: "#fff",
+                        },
+                        grid: {
+                            color: "#374151",
+                        },
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: "Time",
+                            color: "#fff",
+                        },
+                        ticks: {
+                            color: "#fff",
+                        },
+                        grid: {
+                            color: "#374151",
+                        },
+                    },
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: "#fff",
+                        },
+                    },
+                    title: {
+                        display: true,
+                        text: `${label} vs Time`,
+                        color: "#fff",
+                    },
+                },
+            },
+        };
     }
 
     function updatePlots(): void {
@@ -63,147 +135,43 @@
             Chart.Legend
         );
 
-        // Common chart options
-        const commonOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-                intersect: false,
-            },
-            plugins: {
-                legend: {
-                    display: false,
-                },
-            },
-            scales: {
-                x: {
-                    display: true,
-                    grid: {
-                        color: "#4B5563",
-                    },
-                    ticks: {
-                        color: "#D1D5DB",
-                        maxTicksLimit: 8,
-                    },
-                },
-                y: {
-                    display: true,
-                    grid: {
-                        color: "#4B5563",
-                    },
-                    ticks: {
-                        color: "#D1D5DB",
-                    },
-                },
-            },
-            elements: {
-                point: {
-                    radius: 0,
-                    hoverRadius: 4,
-                },
-            },
-        };
-
         // Initialize Bus Power Chart
         if (busPowerCanvas) {
-            busPowerChart = new Chart.Chart(busPowerCanvas, {
-                type: "line",
-                data: {
-                    labels: [],
-                    datasets: [
-                        {
-                            label: "Bus Power (W)",
-                            data: [],
-                            borderColor: "#f59e0b",
-                            backgroundColor: "#f59e0b20",
-                            tension: 0.4,
-                            fill: true,
-                        },
-                    ],
-                },
-                options: {
-                    ...commonOptions,
-                    plugins: {
-                        ...commonOptions.plugins,
-                        title: {
-                            display: true,
-                            text: "Bus Power vs Time",
-                            color: "#fff",
-                            font: {
-                                size: 16,
-                            },
-                        },
-                    },
-                },
-            });
+            busPowerChart = new Chart.Chart(
+                busPowerCanvas,
+                createChartConfig(
+                    "Bus Power",
+                    $globalStore.historic.Bus_Power,
+                    "#f59e0b",
+                    "Bus Power (W)"
+                )
+            );
         }
 
         // Initialize RPM Chart
         if (rpmCanvas) {
-            rpmChart = new Chart.Chart(rpmCanvas, {
-                type: "line",
-                data: {
-                    labels: [],
-                    datasets: [
-                        {
-                            label: "Motor RPM",
-                            data: [],
-                            borderColor: "#10b981",
-                            backgroundColor: "#10b98120",
-                            tension: 0.4,
-                            fill: true,
-                        },
-                    ],
-                },
-                options: {
-                    ...commonOptions,
-                    plugins: {
-                        ...commonOptions.plugins,
-                        title: {
-                            display: true,
-                            text: "Motor RPM vs Time",
-                            color: "#fff",
-                            font: {
-                                size: 16,
-                            },
-                        },
-                    },
-                },
-            });
+            rpmChart = new Chart.Chart(
+                rpmCanvas,
+                createChartConfig(
+                    "Motor RPM",
+                    $globalStore.historic.Motor_Velocity,
+                    "#10b981",
+                    "Motor RPM vs Time"
+                )
+            );
         }
 
         // Initialize Speed Chart
         if (speedCanvas) {
-            speedChart = new Chart.Chart(speedCanvas, {
-                type: "line",
-                data: {
-                    labels: [],
-                    datasets: [
-                        {
-                            label: "Vehicle Speed (km/h)",
-                            data: [],
-                            borderColor: "#3b82f6",
-                            backgroundColor: "#3b82f620",
-                            tension: 0.4,
-                            fill: true,
-                        },
-                    ],
-                },
-                options: {
-                    ...commonOptions,
-                    plugins: {
-                        ...commonOptions.plugins,
-                        title: {
-                            display: true,
-                            text: "Vehicle Speed vs Time",
-                            color: "#fff",
-                            font: {
-                                size: 16,
-                            },
-                        },
-                    },
-                },
-            });
+            speedChart = new Chart.Chart(
+                speedCanvas,
+                createChartConfig(
+                    "Vehicle Speed (km/h)",
+                    $globalStore.historic.Speed2,
+                    "#3b82f6",
+                    "Vehicle Speed vs Time"
+                )
+            );
         }
     });
 
@@ -214,36 +182,63 @@
         if (speedChart) speedChart.destroy();
     });
 
-    // Status calculation functions
-    function getMotorStatus(temperature: number): {
-        color: string;
-        text: string;
-    } {
-        if (temperature < 70) return { color: "bg-green-500", text: "Normal" };
-        if (temperature < 85)
-            return { color: "bg-yellow-500", text: "Warning" };
-        return { color: "bg-red-500", text: "Critical" };
+    interface limitItem{
+        key: keyof TelemetryData['metric']['MotorLimits'];
+        label: string;
     }
 
-    function getThermalStatus(heatsinkTemp: number): {
-        color: string;
-        text: string;
-    } {
-        if (heatsinkTemp < 60) return { color: "bg-green-500", text: "Cool" };
-        if (heatsinkTemp < 75) return { color: "bg-yellow-500", text: "Warm" };
-        return { color: "bg-red-500", text: "Hot" };
+    interface errorItem{
+        key: keyof TelemetryData['metric']['MotorErrors'];
+        label: string;
     }
 
-    function getPowerStatus(busPower: number): { color: string; text: string } {
-        if (busPower < 300) return { color: "bg-green-500", text: "Efficient" };
-        if (busPower < 400) return { color: "bg-yellow-500", text: "High" };
-        return { color: "bg-red-500", text: "Very High" };
-    }
+    // Limit flags configuration
+    const limitLabels:  limitItem[] = [
+        { key: 'ipm_temp_limit', label: 'IPM Temp' },
+        { key: 'bus_voltage_lower_limit', label: 'Bus V Low' },
+        { key: 'bus_voltage_upper_limit', label: 'Bus V High' },
+        { key: 'bus_current_limit', label: 'Bus Current' },
+        { key: 'velocity_limit', label: 'Velocity' },
+        { key: 'motor_current_limit', label: 'Motor Current' },
+        { key: 'output_voltage_pwm_limit', label: 'Output PWM' }
+    ];
 
-    // Reactive status calculations
-    $: motorStatus = getMotorStatus($globalStore.metric.Motor_Temp || 0);
-    $: thermalStatus = getThermalStatus($globalStore.metric.HeatSink_Temp || 0);
-    $: powerStatus = getPowerStatus($globalStore.metric.Bus_Power || 0);
+    // Error flags configuration
+    const errorLabels: errorItem[] = [
+        { key: 'motor_over_speed', label: 'Over Speed' },
+        { key: 'desaturation_fault', label: 'Desaturation' },
+        { key: 'rail_15v_uvlo', label: '15V UVLO' },
+        { key: 'config_read_error', label: 'Config Error' },
+        { key: 'watchdog_reset', label: 'Watchdog' },
+        { key: 'bad_motor_position', label: 'Hall Sequence' },
+        { key: 'dc_bus_over_voltage', label: 'DC Bus OV' },
+        { key: 'software_over_current', label: 'SW OC' },
+        { key: 'hardware_over_current', label: 'HW OC' }
+    ];
+
+    // Reactive statements to extract flags from your global store
+    // Adjust these based on your actual data structure
+    $: limitFlags = {
+        ipm_temp_limit: $globalStore.metric.MotorLimits.ipm_temp_limit,
+        bus_voltage_lower_limit: $globalStore.metric.MotorLimits.bus_voltage_lower_limit,
+        bus_voltage_upper_limit: $globalStore.metric.MotorLimits.bus_voltage_upper_limit,
+        bus_current_limit: $globalStore.metric.MotorLimits.bus_current_limit,
+        velocity_limit: $globalStore.metric.MotorLimits.velocity_limit,
+        motor_current_limit: $globalStore.metric.MotorLimits.motor_current_limit,
+        output_voltage_pwm_limit: $globalStore.metric.MotorLimits.output_voltage_pwm_limit
+    };
+
+    $: errorFlags = {
+        motor_over_speed: $globalStore.metric.MotorErrors.motor_over_speed,
+        desaturation_fault: $globalStore.metric.MotorErrors.desaturation_fault,
+        rail_15v_uvlo: $globalStore.metric.MotorErrors.rail_15v_uvlo,
+        config_read_error: $globalStore.metric.MotorErrors.config_read_error,
+        watchdog_reset: $globalStore.metric.MotorErrors.watchdog_reset,
+        bad_motor_position: $globalStore.metric.MotorErrors.bad_motor_position,
+        dc_bus_over_voltage: $globalStore.metric.MotorErrors.dc_bus_over_voltage,
+        software_over_current: $globalStore.metric.MotorErrors.software_over_current,
+        hardware_over_current: $globalStore.metric.MotorErrors.hardware_over_current
+    };
 </script>
 
 <div class="space-y-6 p-6">
@@ -316,40 +311,38 @@
         </div>
     </div>
 
-    <!-- Motor Status Indicators -->
-    <!-- <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="metric-card">
-            <div class="flex items-center justify-between">
-                <span class="metric-label">Motor Status</span>
-                <div class="flex items-center space-x-2">
-                    <div class="w-3 h-3 rounded-full {motorStatus.color}"></div>
-                    <span class="text-sm">{motorStatus.text}</span>
-                </div>
-            </div>
+    <!-- Motor Limit Flags -->
+    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-gray-400">Motor Limit Status:</span>
         </div>
+        <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            {#each limitLabels as flag}
+                {@const isActive = limitFlags[flag.key as keyof typeof limitFlags]}
+                <div class="flex items-center justify-center space-x-1">
+                    <div class="w-3 h-3 rounded-full {isActive ? 'bg-yellow-500' : 'bg-gray-500'} flex-shrink-0"></div>
+                    <span class="text-xs text-gray-300">{flag.label}</span>
+                </div>
+            {/each}
+        </div>
+    </div>
 
-        <div class="metric-card">
-            <div class="flex items-center justify-between">
-                <span class="metric-label">Thermal Status</span>
-                <div class="flex items-center space-x-2">
-                    <div
-                        class="w-3 h-3 rounded-full {thermalStatus.color}"
-                    ></div>
-                    <span class="text-sm">{thermalStatus.text}</span>
-                </div>
-            </div>
+    <!-- Motor Error Flags -->
+    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-gray-400">Motor Error Status:</span>
         </div>
+        <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {#each errorLabels as flag}
+                {@const isActive = errorFlags[flag.key as keyof typeof errorFlags]}
+                <div class="flex items-center justify-center space-x-1">
+                    <div class="w-3 h-3 rounded-full {isActive ? 'bg-red-500' : 'bg-gray-500'} flex-shrink-0"></div>
+                    <span class="text-xs text-gray-300">{flag.label}</span>
+                </div>
+            {/each}
+        </div>
+    </div>
 
-        <div class="metric-card">
-            <div class="flex items-center justify-between">
-                <span class="metric-label">Power Status</span>
-                <div class="flex items-center space-x-2">
-                    <div class="w-3 h-3 rounded-full {powerStatus.color}"></div>
-                    <span class="text-sm">{powerStatus.text}</span>
-                </div>
-            </div>
-        </div>
-    </div> -->
 
     <!-- Performance Charts -->
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">

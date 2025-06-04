@@ -298,7 +298,7 @@
 
         <div class="metric-card">
             <div class="metric-value text-orange-400">
-                {formatValue($globalStore.metric.motor_temp, "°C")}
+                {formatValue($globalStore.metric.Motor_Temp, "°C")}
             </div>
             <div class="metric-label">Motor Temperature</div>
         </div>

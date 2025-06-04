@@ -13,6 +13,50 @@ import traceback
 
 from downlink import main as run_downlink
 
+# Key Lists
+PACKET_A_DIRECT_KEYS = ("SOC_Ah", "Pack_Voltage", "Pack_Current", "Bus_Voltage",
+                        "Bus_Current", "Motor_Velocity", "PhaseC_Current",
+                        "PhaseB_Current", "Speed",)
+MPPT_NAMES = ('A', 'B', 'C', 'D')
+MPPT_VALUE_KEYS = ("Input_Voltage", "Input_Current",
+                        "Output_Voltage", "Output_Current")
+MPPT_FLAG_NAMES = ('hw_overvolt', 'hw_overcurrent', 'under12v', None,
+                     'low_array_power', 'battery_full', 'battery_low',
+                     'mosfet_overheat', )
+CONTACTOR_FLAG_NAMRS = (
+    'contactor1_error', 'contactor2_error',
+    'contactor1_output', 'contactor2_output',
+    'contactor_supply',
+    'contactor3_error', 'contactor3_output',
+    None
+)
+BMS_FLAG_NAMES = (
+    "cell_over_voltage", "cell_under_voltage", "cell_over_temp",
+    "measurement_untrusted", "cmu_comm_timeout", "vehicle_comm_timeout",
+    "bms_setup_mode", "cmu_can_status", "isolation_test_fail", "soc_invalid",
+    "can_supply_low", "contactor_not_engaged", "extra_cell_detected",
+)
+MOTOR_LIMIT_NAMES = (
+    'ipm_temp_limit', 'bus_voltage_lower_limit',
+    'bus_voltage_upper_limit', 'bus_current_limit',
+    'velocity_limit', 'motor_current_limit',
+    'output_voltage_pwm_limit'
+)
+MOTOR_ERROR_NAMES = (
+    'motor_over_speed', 'desaturation_fault', 'rail_15v_uvlo',
+    'config_read_error', 'watchdog_reset', 'bad_motor_position',
+    'dc_bus_over_voltage', 'software_over_current',
+    'hardware_over_current'
+)
+CABIN_FLAG_NAMES = (
+    'Cabin_CO_Content', 'Cabin_CH4_Content',
+    'Cabin_NH3_Content', 'Cabin_NO2_Content',
+    'Cabin_O2_Content', 'Cabin_Temperature',
+    'Cabin_Pressure', 'Cabin_CO2_Content'
+)
+PACKET_B_DIRECT_KEYS = ("Motor_Temp", "HeatSink_Temp", "DSP_Board_Temp",)
+
+
 # Global state to store current data
 current_data = {
     "metric": {
@@ -26,7 +70,44 @@ current_data = {
         'predicted': 67.2,
 
         'Pack_Current': 46.26,
-        'cmus': [{'temperature': 30.12, 'cell_voltages': [3.7 for _ in range(8)]} for _ in range(5)],
+        'cmus': [{
+            'temperature': 30.12,
+            'cell_temperature': 30.12,
+            'cell_voltages': [3.7 for _ in range(8)]
+        } for _ in range(5)],
+        'battery_ranges': {
+            'min_temp': 0,
+            'max_temp': 0,
+            'min_volt': 0,
+            'max_volt': 0,
+        },
+        'precharge_state': 0,
+        'contactor_flags': {
+            'contactor1_error': False,
+            'contactor2_error': False,
+            'contactor3_error': False,
+            'contactor1_output': False,
+            'contactor2_output': False,
+            'contactor3_output': False,
+
+            'contactor_supply': False,
+        },
+        'bmsFlags': {
+            'cell_over_voltage': False,
+            'cell_under_voltage': False,
+            'cell_over_temp': False,
+            'measurement_untrusted': False,
+            'cmu_comm_timeout': False,
+            'vehicle_comm_timeout': False,
+            'bms_setup_mode': False,
+            'cmu_can_status': False,
+            'isolation_test_fail': False,
+            'soc_invalid': False,
+            'can_supply_low': False,
+            'contactor_not_engaged': False,
+            'extra_cell_detected': False,
+        },
+
 
         'Motor_Velocity': 123,
         'Speed2': 75,
@@ -36,7 +117,28 @@ current_data = {
         'Bus_Voltage': 50,
         'Bus_Current': 45,
         'Bus_Power': 50 * 45,
-
+        'DSP_Board_Temp': 0,
+        'MotorLimits': {
+            'ipm_temp_limit': False,
+            'bus_voltage_lower_limit': False,
+            'bus_voltage_upper_limit': False,
+            'bus_current_limit': False,
+            'velocity_limit': False,
+            'motor_current_limit': False,
+            'output_voltage_pwm_limit': False,
+        },
+        'MotorErrors': {
+            'motor_over_speed': False,
+            'desaturation_fault': False,
+            'rail_15v_uvlo': False,
+            'config_read_error': False,
+            'watchdog_reset': False,
+            'bad_motor_position': False,
+            'dc_bus_over_voltage': False,
+            'software_over_current': False,
+            'hardware_over_current': False,
+        },
+    
         'mppts': [{
             'Input_Voltage': 50,
             'Input_Current': 45,
@@ -44,7 +146,30 @@ current_data = {
             'Output_Current': 45,
             'Output_Power': 50 * 45,
             'efficiency': 98,
+
+            'Mosfet_Temperature': 35,
+            'MPPT_Temperature': 35,
+            'flags': {
+                'hw_overvolt': False,
+                'hw_overcurrent':  False,
+                'under12v': False,
+                'low_array_power': False,
+                'battery_full': False,
+                'battery_low': False,
+                'mosfet_overheat': False,
+            }
         } for _ in range(4)],
+
+        'CabinSensors': {
+            'Cabin_CO_Content': 0.2,
+            'Cabin_CH4_Content': 3,
+            'Cabin_NH3_Content': 4,
+            'Cabin_NO2_Content': 5,
+            'Cabin_O2_Content': 6,
+            'Cabin_Temperature': 35,
+            'Cabin_Pressure': 76,
+            'Cabin_CO2_Content': 2,
+        }
     },
     "historic": {
         'Timestamps': [],
@@ -57,6 +182,8 @@ current_data = {
         'Speed2': [],
         'solar_input_voltage': [],
         'solar_output_power': [],
+        'Acceleration': [],
+        'Altitude': [],
     }
 }
 
@@ -132,35 +259,60 @@ async def update_processor(queue: asyncio.Queue):
             # }
 
             update_packet = {"type": "update"}
+            metric = current_data['metric']
 
             if ptype == "A":
-                metric = {}
-
                 # Direct data
-                for k in ["SOC_Ah", "Pack_Voltage", "Pack_Current", "Bus_Voltage",
-                        "Bus_Current", "Motor_Velocity", "PhaseC_Current",
-                        "PhaseB_Current", "Speed"]:
+                for k in PACKET_A_DIRECT_KEYS:
                     metric[k] = pdata[k]
                 
                 # Direct data - reorganised
-                metric['mppts'] = []
+                mppts = []
                 solar_o = 0
                 solar_i_v = 0
-                for i in ['A', 'B', 'C', 'D']:
+                for i, old in zip(MPPT_NAMES, current_data['mppts']):
                     d = {k: pdata[k + f"_{i}"]
-                        for k in ["Input_Voltage", f"Input_Current",
-                        "Output_Voltage", f"Output_Current"]}
+                        for k in MPPT_VALUE_KEYS}
                     
                     d['Output_Power'] = ds_o = d['Output_Voltage'] * d['Output_Current']
                     solar_o +=  ds_o
                     solar_i_v += d['Input_Voltage']
             
                     d['efficiency'] = ds_o / max(d['Input_Voltage'] * d['Input_Current'], 0.00001)
-                    metric['mppts'].append(d)
+
+                    d['Mosfet_Temperature'] = old['Mosfet_Temperature']
+                    d['MPPT_Temperature'] = old['MPPT_Temperature']
+
+                    d['flags'] = {
+                        key: pdata[F"MPPT_{i}_Flag{j+1}"]
+                        for j, key in enumerate(MPPT_FLAG_NAMES) if key
+                    }
+                    mppts.append(d)
+                
+                metric['mppts'] = mppts
                 solar_i_v /= 4
 
+                # Flags
+                metric['precharge_state'] = sum(i * pdata[f'Precharge_State_Flag{i}'] for i in range(1, 6))
+                metric['contactor_flags'] = {
+                    key: pdata[F"Precharge_Driver_Flag{j+1}"]
+                    for j, key in enumerate(BMS_FLAG_NAMES) if key
+                }
+                metric['bmsFlags'] = {
+                    key: pdata[F"BMS_Flag{j+1}"]
+                    for j, key in enumerate(BMS_FLAG_NAMES) if key
+                }
+                metric['MotorLimits'] = {
+                    key: pdata[F"MC_Limit_Flag{j+1}"]
+                    for j, key in enumerate(MOTOR_LIMIT_NAMES) if key          
+                }
+                metric['MotorErrors'] = {
+                    key: pdata[F"MC_Error_Flag{j+1}"]
+                    for j, key in enumerate(MOTOR_ERROR_NAMES) if key          
+                }
+
                 # Derived data
-                metric['power_consumption'] = output_power = pdata['Bus_Voltage'] * pdata['Bus_Current']
+                metric['power_consumption'] = output_power = pdata['Pack_Voltage'] * pdata['Pack_Current']
                 metric['Speed2'] = pdata['Vehicle_Velocity']
                 metric['solar_input'] = solar_o
 
@@ -176,26 +328,63 @@ async def update_processor(queue: asyncio.Queue):
 
                     'solar_input_voltage': solar_i_v,
                     'solar_output_power': solar_o,
+
+                    'Altitude': pdata['Altitude'],
+                    'Acceleration': math.sqrt(sum(pdata[f'acc_{i}']**2 for i in ('X', 'Y', 'Z'))),
                 }
 
                 for k in current_data['historic']:
                     if k in historic:
                         current_data['historic'][k].append(historic[k])
 
-                update_packet['metric'] = metric
                 update_packet['historic'] = historic
             
             if ptype == 'B':
-                metric = {}
-
+                for k in PACKET_B_DIRECT_KEYS:
+                    metric[k] = pdata[k]
+                
+                mppts = []
+                for i, old in zip(MPPT_NAMES, current_data['mppts']):
+                    mppts.append({
+                        **old,
+                        'Mosfet_Temperature': pdata[f'Mosfet_Temp_{i}'],
+                        'MPPT_Temperature': pdata[f'Controller_Temp_{i}'],
+                    })
+                metric['mppts'] = mppts
+                
                 metric['cmus'] = []
                 output_power = 0
-                for i in range(1, 6):
-                    d = {"temperature": pdata[f"CMU{i}_Temp"]}
-                    d['cell_voltages'] = [pdata[f"CMU{i}_Cell{j}_Voltage"] for j in range(8)]
-                    metric['cmus'].append(d)
                 
-                update_packet['metric'] = metric
+                minTemp, maxTemp = float('inf'), -float('inf')
+                minVolt, maxVolt = float('inf'), -float('inf')
+
+                for i in range(1, 6):
+                    d = {
+                        "temperature": pdata[f"CMU{i}_Temp"],
+                        "cell_temperature": pdata[f"Cell{i}_Temp"],
+                    }
+                    minTemp = min(minTemp, d['temperature'], d['cell_temperature'])
+                    maxTemp = max(maxTemp, d['temperature'], d['cell_temperature'])
+
+                    d['cell_voltages'] = [pdata[f"CMU{i}_Cell{j}_Voltage"] for j in range(8)]
+                    minVolt = min(minVolt, min(d['cell_voltages']))
+                    maxVolt = max(maxVolt, max(d['cell_voltages']))
+
+                    metric['cmus'].append(d)
+
+                metric['battery_ranges'] = {
+                    'min_temp': minTemp,
+                    'max_temp': maxTemp,
+                    'min_volt': minVolt,
+                    'max_volt': maxVolt,
+                }
+
+                metric['CabinSensors'] = {
+                    key: pdata[key]
+                    for key in CABIN_FLAG_NAMES       
+                }
+                
+            current_data['metric'] = update_packet['metric'] = metric
 
             # Broadcast update =====================================
             print("broadcasting")

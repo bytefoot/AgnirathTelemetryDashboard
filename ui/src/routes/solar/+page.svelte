@@ -13,6 +13,7 @@
         type ChartConfiguration,
     } from "chart.js";
     import { globalStore } from "$lib/store";
+    import type { MPPTFlags } from '$lib/store_types';
 
     // Register Chart.js components
     Chart.register(
@@ -34,6 +35,23 @@
     let inputVoltageChart: Chart;
     let outputPowerChart: Chart;
 
+    const mpptNames = ['A', 'B', 'C', 'D'];
+
+    type FlagItem = {
+        key: keyof MPPTFlags;  // Ensures key must match SystemFlags properties
+        label: string;
+    };
+    
+    const flags: FlagItem[] = [
+        { key: 'hw_overvolt', label: 'HW OV'},
+        { key: 'hw_overcurrent', label: 'HW OC'},
+        { key: 'under12v', label: '12V UV'},
+        { key: 'low_array_power', label: 'LAP'},
+        { key: 'battery_full', label: 'Batt Full'},
+        { key: 'battery_low', label: 'Batt Low'},
+        { key: 'mosfet_overheat', label: 'MOSFET'},
+    ];
+
     // MPPT colors for charts
     const mpptColors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
 
@@ -44,19 +62,6 @@
     ): string {
         if (typeof value !== "number") return "N/A";
         return `${value.toFixed(decimals)}${unit}`;
-    }
-
-    function getStatusColor(status: string): string {
-        switch (status) {
-            case "ok":
-                return "text-green-400";
-            case "warning":
-                return "text-yellow-400";
-            case "error":
-                return "text-red-400";
-            default:
-                return "text-gray-400";
-        }
     }
 
     function getStatusBorder(status: string): string {
@@ -254,9 +259,7 @@
         <div class="mppt-grid">
             {#each $globalStore.metric.mppts as mppt, mpptIndex}
                 <div
-                    class="mppt-card-modern {getStatusBorder(
-                        'ok'
-                    )} {getStatusBg('ok')}"
+                    class="mppt-card-modern {getStatusBorder('ok')} {getStatusBg('ok')}"
                 >
                     <!-- MPPT Header -->
                     <div class="mppt-header">
@@ -265,28 +268,50 @@
                                 class="mppt-name"
                                 style="color: {mpptColors[mpptIndex]}"
                             >
-                                {"MPPT " + mpptIndex.toString()}
+                                {"MPPT " + mpptNames[mpptIndex]}
                             </h3>
                             <div class="power-display">
                                 <span class="power-value text-yellow-400"
-                                    >{formatValue(
-                                        mppt.Output_Power,
-                                        "",
-                                        0
-                                    )}</span
+                                    >{formatValue(mppt.Output_Power, "", 0)}</span
                                 >
                                 <span class="power-unit">W</span>
                             </div>
                         </div>
-                        <!-- <div class="efficiency-circle {mppt.status === 'ok' ? 'circle-ok' : mppt.status === 'warning' ? 'circle-warning' : 'circle-error'}"> -->
+        
+                        <!-- NEW: Temperature Section -->
+                        <div class="temperature-section">
+                            <div class="temp-item">
+                                <span class="temp-label">MOSFET</span>
+                                <span class="temp-value text-orange-400">
+                                    {formatValue(mppt.Mosfet_Temperature, "°C")}
+                                </span>
+                            </div>
+                            <div class="temp-item">
+                                <span class="temp-label">MPPT</span>
+                                <span class="temp-value text-red-400">
+                                    {formatValue(mppt.MPPT_Temperature, "°C")}
+                                </span>
+                            </div>
+                        </div>
+        
                         <div class="efficiency-circle circle-ok">
                             <span class="efficiency-text"
                                 >{formatValue(mppt.efficiency, "", 1)}%</span
                             >
                         </div>
                     </div>
-
-                    <!-- Metrics Grid -->
+        
+                    <!-- NEW: MPPT Flags -->
+                    <div class="mppt-flags">
+                        {#each flags as flag}
+                            <div class="flag-indicator {mppt.flags[flag.key] ? 'flag-active' : 'flag-inactive'}">
+                                <div class="flag-dot"></div>
+                                <span class="flag-text">{flag.label}</span>
+                            </div>
+                        {/each}
+                    </div>
+        
+                    <!-- Metrics Grid (unchanged) -->
                     <div class="metrics-grid">
                         <!-- Input Column -->
                         <div class="metric-column">
@@ -295,10 +320,7 @@
                                 <span class="metric-icon">⚡</span>
                                 <div class="metric-data">
                                     <span class="metric-value text-blue-400"
-                                        >{formatValue(
-                                            mppt.Input_Voltage,
-                                            ""
-                                        )}</span
+                                        >{formatValue(mppt.Input_Voltage, "")}</span
                                     >
                                     <span class="metric-unit">V</span>
                                 </div>
@@ -307,16 +329,13 @@
                                 <span class="metric-icon">🔌</span>
                                 <div class="metric-data">
                                     <span class="metric-value text-cyan-400"
-                                        >{formatValue(
-                                            mppt.Input_Current,
-                                            ""
-                                        )}</span
+                                        >{formatValue(mppt.Input_Current, "")}</span
                                     >
                                     <span class="metric-unit">A</span>
                                 </div>
                             </div>
                         </div>
-
+        
                         <!-- Output Column -->
                         <div class="metric-column">
                             <div class="column-label">OUTPUT</div>
@@ -324,10 +343,7 @@
                                 <span class="metric-icon">⚡</span>
                                 <div class="metric-data">
                                     <span class="metric-value text-green-400"
-                                        >{formatValue(
-                                            mppt.Output_Voltage,
-                                            ""
-                                        )}</span
+                                        >{formatValue(mppt.Output_Voltage, "")}</span
                                     >
                                     <span class="metric-unit">V</span>
                                 </div>
@@ -336,31 +352,12 @@
                                 <span class="metric-icon">🔌</span>
                                 <div class="metric-data">
                                     <span class="metric-value text-emerald-400"
-                                        >{formatValue(
-                                            mppt.Output_Current,
-                                            ""
-                                        )}</span
+                                        >{formatValue(mppt.Output_Current, "")}</span
                                     >
                                     <span class="metric-unit">A</span>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Status Bar -->
-                    <div class="status-bar">
-                        <!-- <div class="status-indicator-bar {mppt.status === 'ok' ? 'bar-ok' : mppt.status === 'warning' ? 'bar-warning' : 'bar-error'}"> -->
-                        <div class="status-indicator-bar bar-ok">
-                            <div
-                                class="status-fill"
-                                style="width: {mppt.efficiency}%; background: linear-gradient(90deg, {mpptColors[
-                                    mpptIndex
-                                ]}40, {mpptColors[mpptIndex]})"
-                            ></div>
-                        </div>
-                        <span class="status-text {getStatusColor('ok')}"
-                            >{"OK".toUpperCase()}</span
-                        >
                     </div>
                 </div>
             {/each}
@@ -517,22 +514,6 @@
         @apply text-xs text-gray-400;
     }
 
-    .status-bar {
-        @apply flex items-center gap-2;
-    }
-
-    .status-indicator-bar {
-        @apply flex-1 h-2 bg-gray-700 rounded-full overflow-hidden;
-    }
-
-    .status-fill {
-        @apply h-full transition-all duration-500;
-    }
-
-    .status-text {
-        @apply text-xs font-bold;
-    }
-
     .charts-section {
         @apply grid grid-cols-1 xl:grid-cols-2 gap-6;
     }
@@ -572,5 +553,64 @@
         50% {
             opacity: 0.5;
         }
+    }
+
+/* NEW: Temperature Section Styles */
+.temperature-section {
+        @apply flex gap-1 mx-2 mr-6.5;
+    }
+
+    .temp-item {
+        @apply flex flex-col items-center;
+    }
+
+    .temp-label {
+        @apply text-xs text-gray-400 font-medium;
+    }
+
+    .temp-value {
+        @apply text-sm font-bold;
+    }
+
+    /* NEW: MPPT Flags Styles */
+    .mppt-flags {
+        @apply flex flex-wrap gap-1 mb-3 px-1;
+    }
+
+    .flag-indicator {
+        @apply flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors;
+    }
+
+    .flag-active {
+        @apply bg-red-900/30 border border-red-500/50;
+    }
+
+    .flag-inactive {
+        @apply bg-gray-800/50 border border-gray-600/30;
+    }
+
+    .flag-dot {
+        @apply w-2 h-2 rounded-full flex-shrink-0;
+    }
+
+    .flag-active .flag-dot {
+        @apply bg-red-400;
+    }
+
+    .flag-inactive .flag-dot {
+        @apply bg-gray-500;
+    }
+
+    .flag-text {
+        @apply text-gray-300 font-medium leading-none;
+    }
+
+    .flag-active .flag-text {
+        @apply text-red-300;
+    }
+
+    /* MODIFY existing mppt-header to accommodate new layout */
+    .mppt-header {
+        @apply flex items-start justify-between mb-3; /* reduced margin bottom */
     }
 </style>

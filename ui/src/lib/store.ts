@@ -20,8 +20,41 @@ const initialState: TelemetryData = {
         Pack_Current: 0,
         cmus: Array.from({ length: 5 }, () => ({
             temperature: 0,
+            cell_temperature: 0,
             cell_voltages: Array.from({ length: 8 }, () => 0)
         })),
+        battery_ranges: {
+            min_temp: 0,
+            max_temp: 0,
+            min_volt: 0,
+            max_volt: 0,
+        },
+        precharge_state: 0,
+        contactor_flags: {
+            contactor1_error: false,
+            contactor2_error: false,
+            contactor3_error: false,
+            contactor1_output: false,
+            contactor2_output: false,
+            contactor3_output: false,
+
+            contactor_supply: false,
+        },
+        bmsFlags: {
+            cell_over_voltage: false,
+            cell_under_voltage: false,
+            cell_over_temp: false,
+            measurement_untrusted: false,
+            cmu_comm_timeout: false,
+            vehicle_comm_timeout: false,
+            bms_setup_mode: false,
+            cmu_can_status: false,
+            isolation_test_fail: false,
+            soc_invalid: false,
+            can_supply_low: false,
+            contactor_not_engaged: false,
+            extra_cell_detected: false,
+        },
 
         // Motor
         Motor_Velocity: 0,
@@ -32,6 +65,27 @@ const initialState: TelemetryData = {
         Bus_Voltage: 0,
         Bus_Current: 0,
         Bus_Power: 0,
+        DSP_Board_Temp: 0,
+        MotorLimits: {
+            ipm_temp_limit: false,
+            bus_voltage_lower_limit: false,
+            bus_voltage_upper_limit: false,
+            bus_current_limit: false,
+            velocity_limit: false,
+            motor_current_limit: false,
+            output_voltage_pwm_limit: false,
+        },
+        MotorErrors: {
+            motor_over_speed: false,
+            desaturation_fault: false,
+            rail_15v_uvlo: false,
+            config_read_error: false,
+            watchdog_reset: false,
+            bad_motor_position: false,
+            dc_bus_over_voltage: false,
+            software_over_current: false,
+            hardware_over_current: false,
+        },
 
         // Solar
         mppts: Array.from({ length: 4 }, () => ({
@@ -41,7 +95,31 @@ const initialState: TelemetryData = {
             Output_Current: 0,
             Output_Power: 0,
             efficiency: 0,
+
+            Mosfet_Temperature: 0,
+            MPPT_Temperature: 0,
+
+            flags: {
+                hw_overvolt: false,
+                hw_overcurrent:  false,
+                under12v: false,
+                low_array_power: false,
+                battery_full: false,
+                battery_low: false,
+                mosfet_overheat: false,
+            }
         })),
+
+        CabinSensors: {
+            Cabin_CO_Content: 0,
+            Cabin_CH4_Content: 0,
+            Cabin_NH3_Content: 0,
+            Cabin_NO2_Content: 0,
+            Cabin_O2_Content: 0,
+            Cabin_Temperature: 0,
+            Cabin_Pressure: 0,
+            Cabin_CO2_Content: 0,
+        }
     },
     historic: {
         Timestamps: [],
@@ -59,6 +137,10 @@ const initialState: TelemetryData = {
         // Solar
         solar_input_voltage: [],
         solar_output_power: [],
+
+        // Strategy
+        Acceleration: [],
+        Altitude: [],
     }
 };
 

@@ -1,372 +1,512 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { globalStore } from "$lib/store";
+    import type { TelemetryData } from "$lib/store_types";
 
-    // TypeScript interfaces
-    interface TemperatureReading {
-        id: string;
-        name: string;
-        temperature: number;
-        warningThreshold: number;
-        errorThreshold: number;
-        unit: string;
-        location: string;
-        category: "motor" | "battery" | "controller" | "ambient" | "solar";
-    }
+    const mpptNames = ['A', 'B', 'C', 'D'];
+    const MotorTempKeys: (keyof TelemetryData['metric'])[] = ['Motor_Temp', 'HeatSink_Temp', 'DSP_Board_Temp',]
 
-    // Temperature data with realistic thresholds
-    let temperatureData: TemperatureReading[] = [
-        {
-            id: "battery_1",
-            name: "Battery Pack Core",
-            temperature: 28.3,
-            warningThreshold: 35,
-            errorThreshold: 45,
-            unit: "°C",
-            location: "Battery Bay",
-            category: "battery",
-        },
-        {
-            id: "battery_2",
-            name: "Battery BMS",
-            temperature: 31.7,
-            warningThreshold: 40,
-            errorThreshold: 50,
-            unit: "°C",
-            location: "Battery Bay",
-            category: "battery",
-        },
-        {
-            id: "battery_3",
-            name: "Cell Block 1",
-            temperature: 29.1,
-            warningThreshold: 35,
-            errorThreshold: 45,
-            unit: "°C",
-            location: "Battery Bay",
-            category: "battery",
-        },
-        {
-            id: "battery_4",
-            name: "Cell Block 2",
-            temperature: 30.4,
-            warningThreshold: 35,
-            errorThreshold: 45,
-            unit: "°C",
-            location: "Battery Bay",
-            category: "battery",
-        },
-        {
-            id: "solar_1",
-            name: "MPPT 1",
-            temperature: 51.3,
-            warningThreshold: 60,
-            errorThreshold: 70,
-            unit: "°C",
-            location: "Solar Array",
-            category: "solar",
-        },
-        {
-            id: "solar_2",
-            name: "MPPT 2",
-            temperature: 49.7,
-            warningThreshold: 60,
-            errorThreshold: 70,
-            unit: "°C",
-            location: "Solar Array",
-            category: "solar",
-        },
-        {
-            id: "solar_3",
-            name: "MPPT 3",
-            temperature: 53.1,
-            warningThreshold: 60,
-            errorThreshold: 70,
-            unit: "°C",
-            location: "Solar Array",
-            category: "solar",
-        },
-        {
-            id: "solar_4",
-            name: "MPPT 4",
-            temperature: 48.9,
-            warningThreshold: 60,
-            errorThreshold: 70,
-            unit: "°C",
-            location: "Solar Array",
-            category: "solar",
-        },
-        {
-            id: "motor_1",
-            name: "Motor Controller",
-            temperature: 68.5,
-            warningThreshold: 75,
-            errorThreshold: 85,
-            unit: "°C",
-            location: "Drive Unit",
-            category: "motor",
-        },
-        {
-            id: "motor_2",
-            name: "Motor Windings",
-            temperature: 72.1,
-            warningThreshold: 80,
-            errorThreshold: 90,
-            unit: "°C",
-            location: "Drive Unit",
-            category: "motor",
-        },
-        {
-            id: "controller_1",
-            name: "Main Controller",
-            temperature: 45.2,
-            warningThreshold: 55,
-            errorThreshold: 65,
-            unit: "°C",
-            location: "Electronics Bay",
-            category: "controller",
-        },
-        {
-            id: "controller_2",
-            name: "Power Distribution",
-            temperature: 42.8,
-            warningThreshold: 50,
-            errorThreshold: 60,
-            unit: "°C",
-            location: "Electronics Bay",
-            category: "controller",
-        },
-        {
-            id: "ambient_1",
-            name: "Cabin Interior",
-            temperature: 24.1,
-            warningThreshold: 35,
-            errorThreshold: 45,
-            unit: "°C",
-            location: "Interior",
-            category: "ambient",
-        },
-        {
-            id: "ambient_2",
-            name: "External Air",
-            temperature: 21.5,
-            warningThreshold: 40,
-            errorThreshold: 50,
-            unit: "°C",
-            location: "Exterior",
-            category: "ambient",
-        },
-    ];
-
+    // Utility functions
     function formatValue(
-        value: number | undefined,
+        value: number,
         unit: string = "",
         decimals: number = 1
     ): string {
-        if (typeof value !== "number") return "N/A";
         return `${value.toFixed(decimals)}${unit}`;
     }
 
-    function getTemperatureStatus(reading: TemperatureReading): "ok" | "warning" | "error" {
-        if (reading.temperature >= reading.errorThreshold) return "error";
-        if (reading.temperature >= reading.warningThreshold) return "warning";
+    function getFlagStatus(
+        flags: Record<string, boolean>
+    ): "ok" | "warning" | "error" {
+        const errorFlags = Object.values(flags).filter(Boolean);
+        if (errorFlags.length > 2) return "error";
+        if (errorFlags.length > 0) return "warning";
         return "ok";
     }
 
-    function getTemperatureColor(reading: TemperatureReading): string {
-        const status = getTemperatureStatus(reading);
+    function getStatusColor(status: "ok" | "warning" | "error"): string {
         switch (status) {
-            case "ok": return "text-green-400";
-            case "warning": return "text-orange-400";
-            case "error": return "text-red-400";
-            default: return "text-gray-400";
+            case "ok":
+                return "text-green-400";
+            case "warning":
+                return "text-orange-400";
+            case "error":
+                return "text-red-400";
+            default:
+                return "text-gray-400";
         }
     }
 
-    function getTemperatureGradient(reading: TemperatureReading): string {
-        const status = getTemperatureStatus(reading);
+    function getStatusBg(status: "ok" | "warning" | "error"): string {
         switch (status) {
-            case "ok": return "from-blue-500 to-green-500";
-            case "warning": return "from-yellow-500 to-orange-500";
-            case "error": return "from-orange-500 to-red-600";
-            default: return "from-gray-500 to-gray-600";
+            case "ok":
+                return "bg-green-500/10 border-green-500/30";
+            case "warning":
+                return "bg-orange-500/10 border-orange-500/50";
+            case "error":
+                return "bg-red-500/10 border-red-500/70";
+            default:
+                return "bg-gray-500/10 border-gray-500/30";
         }
     }
 
-    function getTemperatureBorder(reading: TemperatureReading): string {
-        const status = getTemperatureStatus(reading);
-        switch (status) {
-            case "ok": return "border-green-500/30";
-            case "warning": return "border-orange-500/50";
-            case "error": return "border-red-500/70";
-            default: return "border-gray-500/30";
+    function getGasLevelStatus(
+        value: number,
+        gasType: string
+    ): "ok" | "warning" | "error" {
+        // These are example thresholds - adjust based on your safety requirements
+        const thresholds = {
+            CO: { warning: 10, error: 25 },
+            CH4: { warning: 100, error: 500 },
+            NH3: { warning: 25, error: 50 },
+            NO2: { warning: 3, error: 10 },
+            O2: { warning: 16, error: 14 }, // O2 is inverted - lower is worse
+            CO2: { warning: 1000, error: 5000 },
+        };
+
+        const gasKey = gasType
+            .replace("Cabin_", "")
+            .replace("_Content", "") as keyof typeof thresholds;
+        const threshold = thresholds[gasKey];
+
+        if (!threshold) return "ok";
+
+        if (gasKey === "O2") {
+            // Oxygen - lower values are worse
+            if (value <= threshold.error) return "error";
+            if (value <= threshold.warning) return "warning";
+            return "ok";
+        } else {
+            // Other gases - higher values are worse
+            if (value >= threshold.error) return "error";
+            if (value >= threshold.warning) return "warning";
+            return "ok";
         }
     }
 
-    function getCategoryIcon(category: string): string {
-        switch (category) {
-            case "motor": return "⚡";
-            case "battery": return "🔋";
-            case "controller": return "🖥️";
-            case "solar": return "☀️";
-            case "ambient": return "🌡️";
-            default: return "📊";
-        }
+    function formatFlagName(key: string): string {
+        return key
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (l) => l.toUpperCase())
+            .replace(/Cmu/g, "CMU")
+            .replace(/Bms/g, "BMS")
+            .replace(/Soc/g, "SOC")
+            .replace(/Can/g, "CAN")
+            .replace(/Ipm/g, "IPM")
+            .replace(/Pwm/g, "PWM")
+            .replace(/Dsp/g, "DSP")
+            .replace(/Hw/g, "HW")
+            .replace(/Uvlo/g, "UVLO");
     }
 
-    function getCategoryColor(category: string): string {
-        switch (category) {
-            case "motor": return "text-blue-400";
-            case "battery": return "text-green-400";
-            case "controller": return "text-purple-400";
-            case "solar": return "text-yellow-400";
-            case "ambient": return "text-cyan-400";
-            default: return "text-gray-400";
-        }
-    }
+    // Computed values
+    $: contactor_status = getFlagStatus($globalStore.metric.contactor_flags);
+    $: bms_flag_status = getFlagStatus($globalStore.metric.bmsFlags);
+    $: motor_limit_status = getFlagStatus($globalStore.metric.MotorLimits);
+    $: motor_error_status = getFlagStatus($globalStore.metric.MotorErrors);
+    $: motor_status = getFlagStatus({...$globalStore.metric.MotorLimits, ...$globalStore.metric.MotorErrors});
+    // $: m = getFlagStatus($globalStore.metric.MotorErrors);
 
-    function getCategoryBg(category: string): string {
-        switch (category) {
-            case "motor": return "bg-blue-500/10";
-            case "battery": return "bg-green-500/10";
-            case "controller": return "bg-purple-500/10";
-            case "solar": return "bg-yellow-500/10";
-            case "ambient": return "bg-cyan-500/10";
-            default: return "bg-gray-500/10";
-        }
-    }
+    $: overallSystemStatus = (() => {
+        const statuses = [
+            contactor_status,
+            bms_flag_status,
+            motor_limit_status,
+            motor_error_status,
+            ...$globalStore.metric.mppts.map((mppt) => getFlagStatus(mppt.flags)),
+        ];
 
-    function getTemperaturePercentage(reading: TemperatureReading): number {
-        const range = reading.errorThreshold - 0;
-        const current = Math.max(0, reading.temperature);
-        return Math.min(100, (current / range) * 100);
-    }
-
-    function updateLiveData(): void {
-        temperatureData = temperatureData.map((reading) => ({
-            ...reading,
-            temperature: Math.max(0, reading.temperature + (Math.random() - 0.5) * 2),
-        }));
-    }
-
-    // Group temperatures by category
-    $: groupedTemperatures = temperatureData.reduce((acc, reading) => {
-        if (!acc[reading.category]) {
-            acc[reading.category] = [];
-        }
-        acc[reading.category].push(reading);
-        return acc;
-    }, {} as Record<string, TemperatureReading[]>);
-
-    // Get overall system status
-    $: systemStatus = (() => {
-        const errorCount = temperatureData.filter(r => getTemperatureStatus(r) === "error").length;
-        const warningCount = temperatureData.filter(r => getTemperatureStatus(r) === "warning").length;
-        
-        if (errorCount > 0) return "error";
-        if (warningCount > 0) return "warning";
+        if (statuses.includes("error")) return "error";
+        if (statuses.includes("warning")) return "warning";
         return "ok";
     })();
 
-    onMount(() => {
-        // Set up live data updates
-        const interval = setInterval(updateLiveData, 4000);
-
-        return () => {
-            clearInterval(interval);
-        };
-    });
+    $: totalActiveAlerts = (() => {
+        return [
+            ...Object.values($globalStore.metric.contactor_flags),
+            ...Object.values($globalStore.metric.bmsFlags),
+            ...Object.values($globalStore.metric.MotorLimits),
+            ...Object.values($globalStore.metric.MotorErrors),
+            ...$globalStore.metric.mppts.flatMap((mppt) => Object.values(mppt.flags)),
+        ].filter(Boolean).length;
+    })();
 </script>
 
 <div class="dashboard-container">
     <!-- Header Stats -->
-    <div class="stats-header">
-        <div class="system-status-card {systemStatus === 'ok' ? 'status-ok' : systemStatus === 'warning' ? 'status-warning' : 'status-error'}">
+    <!-- <div class="stats-header">
+        <div class="system-status-card {overallSystemStatus === 'ok' ? 'status-ok' : overallSystemStatus === 'warning' ? 'status-warning' : 'status-error'}">
             <div class="status-indicator">
-                <div class="status-dot {systemStatus === 'ok' ? 'dot-ok' : systemStatus === 'warning' ? 'dot-warning' : 'dot-error'}"></div>
-                <span class="status-text">System Status</span>
+                <div class="status-dot {overallSystemStatus === 'ok' ? 'dot-ok' : overallSystemStatus === 'warning' ? 'dot-warning' : 'dot-error'}"></div>
+                <span class="status-text">Solar Vehicle Telemetry</span>
             </div>
             <div class="status-counts">
                 <div class="count-item">
-                    <span class="count-value text-green-400">{temperatureData.filter(r => getTemperatureStatus(r) === "ok").length}</span>
-                    <span class="count-label">OK</span>
+                    <span class="count-value {getStatusColor(overallSystemStatus)}">{overallSystemStatus.toUpperCase()}</span>
+                    <span class="count-label">SYSTEM</span>
                 </div>
                 <div class="count-item">
-                    <span class="count-value text-orange-400">{temperatureData.filter(r => getTemperatureStatus(r) === "warning").length}</span>
-                    <span class="count-label">WARN</span>
-                </div>
-                <div class="count-item">
-                    <span class="count-value text-red-400">{temperatureData.filter(r => getTemperatureStatus(r) === "error").length}</span>
-                    <span class="count-label">CRIT</span>
+                    <span class="count-value text-red-400">{totalActiveAlerts}</span>
+                    <span class="count-label">ALERTS</span>
                 </div>
             </div>
         </div>
         
         <div class="stat-card">
-            <div class="stat-value text-red-400">{formatValue(Math.max(...temperatureData.map(r => r.temperature)), "°C")}</div>
-            <div class="stat-label">Peak</div>
+            <div class="stat-value text-blue-400">{formatValue(cabinSensors.Cabin_Temperature, "°C")}</div>
+            <div class="stat-label">Cabin Temp</div>
         </div>
         
         <div class="stat-card">
-            <div class="stat-value text-blue-400">{formatValue(temperatureData.reduce((sum, r) => sum + r.temperature, 0) / temperatureData.length, "°C")}</div>
-            <div class="stat-label">Average</div>
+            <div class="stat-value text-green-400">{formatValue(cabinSensors.Cabin_O2_Content, "%")}</div>
+            <div class="stat-label">Oxygen Level</div>
         </div>
-    </div>
+    </div> -->
 
-    <!-- Temperature Grid -->
-    <div class="temp-grid">
-        {#each Object.entries(groupedTemperatures) as [category, readings]}
-            <div class="category-panel {getCategoryBg(category)}">
-                <div class="category-header">
-                    <span class="category-icon">{getCategoryIcon(category)}</span>
-                    <span class="category-title {getCategoryColor(category)}">{category.toUpperCase()}</span>
-                    <div class="category-stats">
-                        {#each readings as reading}
-                            <div class="mini-indicator {getTemperatureStatus(reading) === 'ok' ? 'mini-ok' : getTemperatureStatus(reading) === 'warning' ? 'mini-warning' : 'mini-error'}"></div>
+    <!-- Sensor Grid -->
+    <div class="sensor-grid">
+        <!-- Cabin Air Quality -->
+        <div class="category-panel bg-cyan-500/10 border-cyan-500/30">
+            <div class="category-header">
+                <span class="category-icon">🌬️</span>
+                <span class="category-title text-cyan-400"
+                    >CABIN AIR QUALITY</span
+                >
+            </div>
+
+            <div class="sensors-compact-grid">
+                {#each Object.entries($globalStore.metric.CabinSensors) as [key, value]}
+                    {@const gasStatus = key.includes("_Content")
+                        ? getGasLevelStatus(value, key)
+                        : "ok"}
+                    <div class="compact-sensor-card {getStatusBg(gasStatus)}">
+                        <div class="sensor-label">
+                            {key.replace("Cabin_", "").replace("_", " ")}
+                        </div>
+                        <div class="sensor-value {getStatusColor(gasStatus)}">
+                            {formatValue(
+                                value,
+                                key.includes("Temperature")
+                                    ? "°C"
+                                    : key.includes("Pressure")
+                                      ? "kPa"
+                                      : key.includes("O2")
+                                        ? "%"
+                                        : "ppm"
+                            )}
+                        </div>
+                    </div>
+                {/each}
+            </div>
+        </div>
+
+        <!-- Battery Contactors -->
+        <div class="category-panel bg-yellow-500/5 border-yellow-500/20">
+            <div class="category-header">
+                <span class="category-icon">🔌</span>
+                <span class="category-title text-yellow-400"
+                    >BATTERY CONTACTORS</span
+                >
+                <div class="status-pill {contactor_status}">
+                    {contactor_status.toUpperCase()}
+                </div>
+            </div>
+
+            <div class="modern-flags-container">
+                {#each Object.entries($globalStore.metric.contactor_flags) as [key, value]}
+                    <div class="flag-indicator-row">
+                        <div
+                            class="flag-status-light {value
+                                ? 'active'
+                                : 'inactive'}"
+                        >
+                            <div class="status-ring"></div>
+                            <div class="status-core"></div>
+                        </div>
+                        <div class="flag-info">
+                            <div class="flag-name">{formatFlagName(key)}</div>
+                            <div
+                                class="flag-status-text {value
+                                    ? 'text-red-300'
+                                    : 'text-green-400'}"
+                            >
+                                {value ? "ACTIVE" : "NORMAL"}
+                            </div>
+                        </div>
+                    </div>
+                {/each}
+            </div>
+        </div>
+
+        <!-- BMS Status -->
+        <div class="category-panel bg-green-500/5 border-green-500/20">
+            <div class="category-header">
+                <span class="category-icon">🔋</span>
+                <span class="category-title text-green-400"
+                    >BATTERY MANAGEMENT</span
+                >
+                <div class="status-pill {bms_flag_status}">
+                    {bms_flag_status.toUpperCase()}
+                </div>
+            </div>
+
+            <div class="modern-flags-container">
+                {#each Object.entries($globalStore.metric.bmsFlags) as [key, value]}
+                    <div class="flag-indicator-row">
+                        <div
+                            class="flag-status-light {value
+                                ? 'active'
+                                : 'inactive'}"
+                        >
+                            <div class="status-ring"></div>
+                            <div class="status-core"></div>
+                        </div>
+                        <div class="flag-info">
+                            <div class="flag-name">{formatFlagName(key)}</div>
+                            <div
+                                class="flag-status-text {value
+                                    ? 'text-red-300'
+                                    : 'text-green-400'}"
+                            >
+                                {value ? "FAULT" : "OK"}
+                            </div>
+                        </div>
+                    </div>
+                {/each}
+            </div>
+        </div>
+
+        <!-- CMU Temperatures -->
+        <div class="category-panel bg-emerald-500/5 border-emerald-500/20">
+            <div class="category-header">
+                <span class="category-icon">🌡️</span>
+                <span class="category-title text-emerald-400"
+                    >CMU TEMPERATURES</span
+                >
+            </div>
+
+            <div class="sensors-compact-grid">
+                {#each $globalStore.metric.cmus as cmu, index}
+                    <div
+                        class="compact-sensor-card bg-gray-800/50 border-gray-700/50 backdrop-blur-sm"
+                    >
+                        <div class="sensor-label">{`CMU${index+1} Temp`}</div>
+                        <div class="sensor-value text-emerald-300">
+                            {formatValue(cmu.temperature, "°C")}
+                        </div>
+                    </div>
+                    <div
+                        class="compact-sensor-card bg-gray-800/50 border-gray-700/50 backdrop-blur-sm"
+                    >
+                        <div class="sensor-label">{`Cell${index+1} Temp`}</div>
+                        <div class="sensor-value text-emerald-300">
+                            {formatValue(cmu.cell_temperature, "°C")}
+                        </div>
+                    </div>
+                {/each}
+            </div>
+        </div>
+
+        <!-- Combined Motor System & Errors Panel -->
+        <div
+            class="category-panel bg-blue-500/5 border-blue-500/20 lg:col-span-2"
+        >
+            <div class="category-header">
+                <span class="category-icon">⚡</span>
+                <span class="category-title text-blue-400"
+                    >MOTOR SYSTEM & ERRORS</span
+                >
+                <div
+                    class="status-pill {motor_status}"
+                >
+                    {motor_status.toUpperCase()}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <!-- Temperatures -->
+                <div>
+                    <h4 class="section-subtitle">Temperatures</h4>
+                    <div class="sensors-compact-grid">
+                        {#each MotorTempKeys as key, index}
+                            <div
+                                class="compact-sensor-card bg-gray-800/50 border-gray-700/50 backdrop-blur-sm"
+                            >
+                                <div class="sensor-label">
+                                    {key.replace("_", " ")}
+                                </div>
+                                <div class="sensor-value text-blue-300">
+                                    {formatValue($globalStore.metric[key] as any, "°C")}
+                                </div>
+                            </div>
                         {/each}
                     </div>
                 </div>
-                
-                <div class="sensors-grid">
-                    {#each readings as reading}
-                        <div class="sensor-card {getTemperatureBorder(reading)}">
-                            <div class="sensor-header">
-                                <span class="sensor-name">{reading.name.replace(/\s+/g, '\n')}</span>
-                                <div class="status-indicator-small {getTemperatureStatus(reading) === 'ok' ? 'status-ok-small' : getTemperatureStatus(reading) === 'warning' ? 'status-warning-small' : 'status-error-small'}"></div>
-                            </div>
-                            
-                            <div class="temp-display bg-gradient-to-br {getTemperatureGradient(reading)}">
-                                <span class="temp-value">{formatValue(reading.temperature, '')}</span>
-                                <span class="temp-unit">°C</span>
-                            </div>
-                            
-                            <div class="temp-bar-container">
-                                <div class="temp-bar-bg">
-                                    <div class="temp-bar-fill bg-gradient-to-r {getTemperatureGradient(reading)}" 
-                                         style="width: {getTemperaturePercentage(reading)}%"></div>
-                                    <div class="threshold warning-threshold" 
-                                         style="left: {(reading.warningThreshold / reading.errorThreshold) * 100}%"></div>
-                                    <div class="threshold error-threshold" 
-                                         style="left: 100%"></div>
+
+                <!-- System Limits -->
+                <div>
+                    <h4 class="section-subtitle">System Limits</h4>
+                    <div class="modern-flags-container">
+                        {#each Object.entries($globalStore.metric.MotorLimits) as [key, value]}
+                            <div class="flag-indicator-row">
+                                <div
+                                    class="flag-status-light {value
+                                        ? 'active'
+                                        : 'inactive'}"
+                                >
+                                    <div class="status-ring"></div>
+                                    <div class="status-core"></div>
+                                </div>
+                                <div class="flag-info">
+                                    <div class="flag-name">
+                                        {formatFlagName(key)}
+                                    </div>
+                                    <div
+                                        class="flag-status-text {value
+                                            ? 'text-orange-300'
+                                            : 'text-green-400'}"
+                                    >
+                                        {value ? "LIMITED" : "NORMAL"}
+                                    </div>
                                 </div>
                             </div>
-                            
-                            <div class="thresholds">
-                                <span class="threshold-text text-orange-300">{reading.warningThreshold}°</span>
-                                <span class="threshold-text text-red-300">{reading.errorThreshold}°</span>
+                        {/each}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Errors Section -->
+            <div>
+                <h4 class="section-subtitle">Motor Errors</h4>
+                <div class="modern-flags-container">
+                    {#each Object.entries($globalStore.metric.MotorErrors) as [key, value]}
+                        <div class="flag-indicator-row">
+                            <div
+                                class="flag-status-light {value
+                                    ? 'active error'
+                                    : 'inactive'}"
+                            >
+                                <div class="status-ring"></div>
+                                <div class="status-core"></div>
+                            </div>
+                            <div class="flag-info">
+                                <div class="flag-name">
+                                    {formatFlagName(key)}
+                                </div>
+                                <div
+                                    class="flag-status-text {value
+                                        ? 'text-red-300'
+                                        : 'text-green-400'}"
+                                >
+                                    {value ? "ERROR" : "OK"}
+                                </div>
                             </div>
                         </div>
                     {/each}
                 </div>
             </div>
-        {/each}
+        </div>
+
+        <!-- Update the MPPT Controllers panel to span full width -->
+        <!-- MPPT Controllers -->
+        <div
+            class="category-panel bg-orange-500/5 border-orange-500/20 lg:col-span-2"
+        >
+            <div class="category-header">
+                <span class="category-icon">☀️</span>
+                <span class="category-title text-orange-400"
+                    >SOLAR MPPT CONTROLLERS</span
+                >
+            </div>
+
+            <div class="mppt-grid">
+                {#each $globalStore.metric.mppts as mppt, mpptIndex}
+                    {@const mpptStatus = getFlagStatus(mppt.flags)}
+                    <div
+                        class="mppt-card {getStatusBg(
+                            mpptStatus
+                        )} backdrop-blur-sm"
+                    >
+                        <div class="mppt-header">
+                            <span class="mppt-name">{mpptNames[mpptIndex]}</span>
+                            <div class="status-pill {mpptStatus}">
+                                {mpptStatus.toUpperCase()}
+                            </div>
+                        </div>
+
+                        <div class="temp-readings">
+                            <div class="temp-item">
+                                <span class="temp-label">MOSFET</span>
+                                <span class="temp-value"
+                                    >{formatValue(
+                                        mppt.Mosfet_Temperature,
+                                        "°C"
+                                    )}</span
+                                >
+                            </div>
+                            <div class="temp-item">
+                                <span class="temp-label">MPPT</span>
+                                <span class="temp-value"
+                                    >{formatValue(
+                                        mppt.MPPT_Temperature,
+                                        "°C"
+                                    )}</span
+                                >
+                            </div>
+                        </div>
+
+                        <div class="mppt-flags">
+                            <div class="flags-header">System Status</div>
+                            <div class="modern-flags-compact">
+                                {#each Object.entries(mppt.flags) as [key, value]}
+                                    <div class="compact-flag-row">
+                                        <div
+                                            class="flag-status-dot {value
+                                                ? 'active'
+                                                : 'inactive'}"
+                                        ></div>
+                                        <div class="compact-flag-name">
+                                            {formatFlagName(key)}
+                                        </div>
+                                        <div
+                                            class="compact-flag-status {value
+                                                ? 'text-red-300'
+                                                : 'text-green-400'}"
+                                        >
+                                            {value ? "⚠" : "✓"}
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        </div>
+                    </div>
+                {/each}
+            </div>
+        </div>
     </div>
 </div>
 
-<style lang='postcss'>
+<style lang="postcss">
     @reference "tailwindcss";
 
     .dashboard-container {
-        @apply p-4 space-y-4 bg-gray-900 min-h-screen;
+        @apply p-4 space-y-6 bg-gray-900 min-h-screen;
+        background: radial-gradient(
+                circle at 20% 50%,
+                rgba(59, 130, 246, 0.05) 0%,
+                transparent 50%
+            ),
+            radial-gradient(
+                circle at 80% 20%,
+                rgba(16, 185, 129, 0.05) 0%,
+                transparent 50%
+            ),
+            radial-gradient(
+                circle at 40% 80%,
+                rgba(245, 158, 11, 0.05) 0%,
+                transparent 50%
+            ),
+            #0f172a;
     }
 
     .stats-header {
@@ -374,47 +514,54 @@
     }
 
     .system-status-card {
-        @apply rounded-xl p-4 border-2 transition-all duration-300;
+        @apply rounded-2xl p-6 border-2 transition-all duration-300 backdrop-blur-sm;
+        background: rgba(15, 23, 42, 0.8);
     }
 
     .system-status-card.status-ok {
-        @apply border-green-500 bg-green-500/5;
+        @apply border-green-500/50 bg-green-500/5;
+        box-shadow: 0 0 20px rgba(34, 197, 94, 0.1);
     }
 
     .system-status-card.status-warning {
-        @apply border-orange-500 bg-orange-500/5;
+        @apply border-orange-500/50 bg-orange-500/5;
+        box-shadow: 0 0 20px rgba(249, 115, 22, 0.1);
     }
 
     .system-status-card.status-error {
-        @apply border-red-500 bg-red-500/5;
+        @apply border-red-500/50 bg-red-500/5;
         animation: critical-pulse 2s ease-in-out infinite;
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
     }
 
     .status-indicator {
-        @apply flex items-center gap-2 mb-3;
+        @apply flex items-center gap-3 mb-4;
     }
 
     .status-dot {
-        @apply w-3 h-3 rounded-full;
+        @apply w-4 h-4 rounded-full;
     }
 
     .status-dot.dot-ok {
         @apply bg-green-500;
+        box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
         animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 
     .status-dot.dot-warning {
         @apply bg-orange-500;
+        box-shadow: 0 0 10px rgba(249, 115, 22, 0.5);
         animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 
     .status-dot.dot-error {
         @apply bg-red-500;
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
         animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 
     .status-text {
-        @apply text-white font-semibold text-sm;
+        @apply text-white font-bold text-base;
     }
 
     .status-counts {
@@ -426,169 +573,244 @@
     }
 
     .count-value {
-        @apply text-xl font-bold block;
+        @apply text-2xl font-bold block;
     }
 
     .count-label {
-        @apply text-xs text-gray-400;
+        @apply text-xs text-gray-400 font-medium;
     }
 
     .stat-card {
-        @apply bg-gray-800 rounded-xl p-4 text-center;
+        @apply bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 text-center border border-gray-700/50;
     }
 
     .stat-value {
-        @apply text-2xl font-bold;
+        @apply text-3xl font-bold;
     }
 
     .stat-label {
-        @apply text-sm text-gray-400 mt-1;
+        @apply text-sm text-gray-400 mt-2 font-medium;
     }
 
-    .temp-grid {
-        @apply grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4;
+    .sensor-grid {
+        @apply grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6;
     }
 
     .category-panel {
-        @apply rounded-xl p-4 border border-gray-700;
+        @apply rounded-2xl p-6 border backdrop-blur-sm transition-all duration-300;
+        background: rgba(15, 23, 42, 0.6);
     }
 
     .category-header {
-        @apply flex items-center justify-between mb-3;
+        @apply flex items-center justify-between mb-6;
     }
 
     .category-icon {
-        @apply text-lg;
+        @apply text-2xl;
     }
 
     .category-title {
-        @apply font-bold text-sm flex-1 ml-2;
+        @apply font-bold text-sm flex-1 ml-3 tracking-wide;
     }
 
-    .category-stats {
-        @apply flex gap-1;
+    .status-pill {
+        @apply px-3 py-1 rounded-full text-xs font-bold;
     }
 
-    .mini-indicator {
-        @apply w-2 h-2 rounded-full;
+    .status-pill.ok {
+        @apply bg-green-500/20 text-green-300 border border-green-500/30;
     }
 
-    .mini-indicator.mini-ok {
-        @apply bg-green-500;
+    .status-pill.warning {
+        @apply bg-orange-500/20 text-orange-300 border border-orange-500/30;
     }
 
-    .mini-indicator.mini-warning {
-        @apply bg-orange-500;
+    .status-pill.error {
+        @apply bg-red-500/20 text-red-300 border border-red-500/30;
+        animation: pill-pulse 2s ease-in-out infinite;
     }
 
-    .mini-indicator.mini-error {
-        @apply bg-red-500;
-        animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    }
-
-    .sensors-grid {
+    .sensors-compact-grid {
         @apply grid grid-cols-2 gap-3;
     }
 
-    .sensor-card {
-        @apply bg-gray-800 rounded-lg p-3 border transition-all duration-300 hover:scale-105;
+    .compact-sensor-card {
+        @apply rounded-xl p-4 border transition-all duration-300;
     }
 
-    .sensor-header {
-        @apply flex items-start justify-between mb-2;
+    .sensor-label {
+        @apply text-xs text-gray-400 font-medium mb-2;
     }
 
-    .sensor-name {
-        @apply text-xs text-gray-300 font-medium leading-tight flex-1 whitespace-pre-line;
+    .sensor-value {
+        @apply text-lg font-bold;
     }
 
-    .status-indicator-small {
-        @apply w-2 h-2 rounded-full flex-shrink-0 ml-1;
+    /* Modern Flag Design */
+    .modern-flags-container {
+        @apply grid grid-cols-2 gap-3;
     }
 
-    .status-indicator-small.status-ok-small {
-        @apply bg-green-500;
+    .flag-indicator-row {
+        @apply flex items-center gap-4 p-3 rounded-xl bg-gray-800/30 border border-gray-700/30 transition-all duration-300 h-full;
     }
 
-    .status-indicator-small.status-warning-small {
-        @apply bg-orange-500;
+    .flag-indicator-row:hover {
+        @apply bg-gray-800/50;
     }
 
-    .status-indicator-small.status-error-small {
-        @apply bg-red-500;
-        animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    .flag-status-light {
+        @apply relative w-6 h-6 flex-shrink-0 flex items-center justify-center;
     }
 
-    .temp-display {
-        @apply rounded-md p-2 text-center mb-2 shadow-inner;
+    .status-ring {
+        @apply absolute inset-0 rounded-full border-2 opacity-60;
+        border-color: currentColor;
+    }
+
+    .status-core {
+        @apply w-3 h-3 rounded-full transition-all duration-300;
+    }
+
+    .flag-status-light .status-core {
+        @apply scale-0;
+    }
+
+    .flag-status-light.active .status-core {
+        @apply scale-100 bg-red-500;
+    }
+
+    .flag-status-light.inactive .status-core {
+        @apply scale-100 bg-green-500;
+    }
+
+    .flag-status-light.active .status-ring {
+        animation: ring-pulse 2s infinite;
+    }
+
+    .flag-info {
+        @apply flex-1;
+    }
+
+    .flag-name {
+        @apply text-sm font-medium;
+    }
+
+    .flag-status-text {
+        @apply text-xs font-bold mt-1;
+    }
+
+    /* Motor System */
+    .motor-section {
+        @apply space-y-6;
+    }
+
+    .section-subtitle {
+        @apply text-sm font-bold text-gray-300 mb-3;
+    }
+
+    /* MPPT Cards */
+    .mppt-grid {
+        @apply grid grid-cols-1 sm:grid-cols-2 gap-4;
+    }
+
+    .mppt-card {
+        @apply rounded-2xl p-4 border transition-all duration-300;
+    }
+
+    .mppt-header {
+        @apply flex justify-between items-center mb-4;
+    }
+
+    .mppt-name {
+        @apply font-bold text-gray-200;
+    }
+
+    .temp-readings {
+        @apply grid grid-cols-2 gap-3 mb-4;
+    }
+
+    .temp-item {
+        @apply bg-gray-800/30 p-3 rounded-lg;
+    }
+
+    .temp-label {
+        @apply text-xs text-gray-400;
     }
 
     .temp-value {
-        @apply text-lg font-bold text-white;
+        @apply font-bold text-lg;
     }
 
-    .temp-unit {
-        @apply text-xs text-white/80 ml-1;
+    .mppt-flags {
+        @apply mt-4;
     }
 
-    .temp-bar-container {
-        @apply mb-2;
+    .flags-header {
+        @apply text-xs text-gray-400 mb-2;
     }
 
-    .temp-bar-bg {
-        @apply w-full h-1.5 bg-gray-700 rounded-full relative overflow-hidden;
+    .modern-flags-compact {
+        @apply grid grid-cols-2 gap-2;
     }
 
-    .temp-bar-fill {
-        @apply h-full rounded-full transition-all duration-500 ease-out;
+    .compact-flag-row {
+        @apply flex items-center gap-2;
     }
 
-    .threshold {
-        @apply absolute top-0 w-0.5 h-full z-10;
+    .flag-status-dot {
+        @apply w-2 h-2 rounded-full;
     }
 
-    .threshold.warning-threshold {
-        @apply bg-orange-400;
+    .flag-status-dot.active {
+        @apply bg-red-500;
     }
 
-    .threshold.error-threshold {
-        @apply bg-red-400;
+    .flag-status-dot.inactive {
+        @apply bg-green-500;
     }
 
-    .thresholds {
-        @apply flex justify-between;
+    .compact-flag-name {
+        @apply text-xs text-gray-300 flex-1;
     }
 
-    .threshold-text {
-        @apply text-xs font-medium;
-    }
-
+    /* Animations */
     @keyframes pulse {
-        0%, 100% {
+        0%,
+        100% {
             opacity: 1;
         }
         50% {
-            opacity: .5;
+            opacity: 0.5;
         }
     }
 
     @keyframes critical-pulse {
-        0%, 100% {
-            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
         }
-        50% {
-            box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.1);
+        70% {
+            box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
         }
     }
 
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-        .sensors-grid {
-            @apply grid-cols-1;
+    @keyframes pill-pulse {
+        0%,
+        100% {
+            opacity: 1;
         }
-        
-        .temp-grid {
-            @apply grid-cols-1;
+        50% {
+            opacity: 0.7;
+        }
+    }
+
+    @keyframes ring-pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+        }
+        70% {
+            box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
         }
     }
 </style>
