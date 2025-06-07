@@ -6,9 +6,11 @@
 
     // Variables
     let busPowerCanvas: HTMLCanvasElement;
+    let phaseACanvas: HTMLCanvasElement;
     let rpmCanvas: HTMLCanvasElement;
     let speedCanvas: HTMLCanvasElement;
     let busPowerChart: Chart.Chart;
+    let phaseAChart: Chart.Chart;
     let rpmChart: Chart.Chart;
     let speedChart: Chart.Chart;
 
@@ -102,6 +104,13 @@
             busPowerChart.data.datasets[0].data = $globalStore.historic.Bus_Power;
             busPowerChart.update("none");
         }
+        
+        // Update Phase A Current Chart
+        if (phaseAChart) {
+            phaseAChart.data.labels = $globalStore.historic.Timestamps;
+            phaseAChart.data.datasets[0].data = $globalStore.historic.PhaseA_Current;
+            phaseAChart.update("none");
+        }
 
         // Update RPM Chart
         if (rpmChart) {
@@ -143,6 +152,19 @@
                     "Bus Power",
                     $globalStore.historic.Bus_Power,
                     "#f59e0b",
+                    "Bus Power (W)"
+                )
+            );
+        }
+
+        // Initialise Phase A Current Canvas
+        if (phaseACanvas) {
+            phaseAChart = new Chart.Chart(
+                phaseACanvas,
+                createChartConfig(
+                    "Phase A Current",
+                    $globalStore.historic.PhaseA_Current,
+                    "#ab47bc",
                     "Bus Power (W)"
                 )
             );
@@ -274,7 +296,14 @@
     </div>
 
     <!-- Phase Current and Bus Metrics -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div class="metric-card">
+            <div class="metric-value text-purple-400">
+                {formatValue($globalStore.metric.PhaseA_Current, "A")}
+            </div>
+            <div class="metric-label">Phase Current A</div>
+        </div>
+    
         <div class="metric-card">
             <div class="metric-value text-purple-400">
                 {formatValue($globalStore.metric.PhaseB_Current, "A")}
@@ -345,11 +374,15 @@
 
 
     <!-- Performance Charts -->
+    <div class="plot-container">
+        <canvas bind:this={busPowerCanvas} class="w-full h-80"></canvas>
+    </div>
+
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div class="plot-container">
-            <canvas bind:this={busPowerCanvas} class="w-full h-80"></canvas>
+            <canvas bind:this={phaseACanvas} class="w-full h-80"></canvas>
         </div>
-
+        
         <div class="plot-container">
             <canvas bind:this={rpmCanvas} class="w-full h-80"></canvas>
         </div>

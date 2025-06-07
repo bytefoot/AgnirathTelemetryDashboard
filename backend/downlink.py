@@ -30,7 +30,10 @@ def flush_serial(ser):
         ser.read(ser.in_waiting)
 
 
+prev = None
+
 def read_packet(ser: serial.Serial):
+    global prev
     head_bytes = ser.read(len(HEADER))
     if head_bytes != HEADER:
         # print("header mismatch, dropping packet")
@@ -58,8 +61,13 @@ def read_packet(ser: serial.Serial):
     calc_crc = generate_crc(type_byte + data_bytes)
     if calc_crc != crc_bytes:
         print("CRC check failed, dropping packet")
+        if prev:
+            print(*prev)
+        print(type_byte.decode(), data_bytes.hex(), len(data_bytes))
         flush_serial(ser)
         return None
+
+    prev = (type_byte.decode(), data_bytes.hex(), len(data_bytes))
 
     return {
         "type": type_byte.decode(),
@@ -105,7 +113,7 @@ def reverse_bytestream(data_bytes: bytes, output_order: list[str], fields: dict,
 
             # Convert bytes back to numpy value
             value = np.frombuffer(val_bytes, dtype=dtype)[0]
-            data_buf[key] = value.item()
+            data_buf[key] = value.item() * fields[key].get("multiplier", 1)
 
     return data_buf
 
@@ -152,10 +160,10 @@ def main(queue, loop):
             continue
 
         data_buf = reverse_bytestream(packet['data'], output_order, fields, flags, type_map)
-        log_data(data_buf)
-        print("logged data!!")
-
         loop.call_soon_threadsafe(queue.put_nowait, (packet['type'], data_buf))
+
+        log_data(data_buf)
+        print("logged data!!", data_buf.get('Precharge_State_Flag3', "no"))
 
 
 if __name__ == "__main__":

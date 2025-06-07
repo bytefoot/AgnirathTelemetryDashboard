@@ -8,13 +8,12 @@
         return `${value.toFixed(decimals)} ${unit}`;
     }
 
-    function getVoltageStatusColor(voltage: number | undefined, range?: [number, number]): string {
+    function getVoltageStatusColor(voltage: number | undefined): string {
         if (typeof voltage !== "number") return "bg-gray-600";
 
-        const [min, max] = range || [3.0, 4.0];
-        const ratio = (voltage - min) / (max - min);
-        if (ratio < 0.2 || ratio > 0.9) return "bg-red-500";
-        if (ratio < 0.3 || ratio > 0.8) return "bg-yellow-500";
+        // const [min, max] = [2.5, 4.2];
+        if (voltage > 4.2 || voltage < 2.5) return "bg-red-500";
+        if (voltage > 2.5 && voltage < 2.8) return "bg-yellow-500";
         return "bg-green-500";
     }
 
@@ -28,7 +27,7 @@
 
     function getVoltageProgressWidth(voltage: number | undefined): number {
         if (typeof voltage !== "number") return 0;
-        return Math.min(100, Math.max(0, ((voltage - 3.0) / (4.0 - 3.0)) * 100));
+        return Math.min(100, Math.max(0, ((voltage - 2.5) / (4.2 - 2.5)) * 100));
     }
 
     // New utility functions for precharge and contactor states
@@ -57,6 +56,7 @@
     interface bmsFlag {
         key: keyof TelemetryData['metric']['bmsFlags'];
         label: string;
+        color?: string;
     };
 
 
@@ -69,7 +69,7 @@
         { key: 'measurement_untrusted', label: 'CMU_TO' },
         { key: 'vehicle_comm_timeout', label: 'Veh_TO' },
         { key: 'bms_setup_mode', label: 'Setup' },
-        { key: 'cmu_can_status', label: 'CAN_Status' },
+        { key: 'cmu_can_status', label: 'CAN_Status', color: 'bg-green-400'},
         { key: 'isolation_test_fail', label: 'IsolationFail' },
         { key: 'soc_invalid', label: 'SoC_Invalid' },
         { key: 'can_supply_low', label: 'CAN_Low' },
@@ -204,7 +204,7 @@
             {#each bmsLabels as flag}
                 {@const isActive = $globalStore.metric.bmsFlags[flag.key]}
                 <div class="flex items-center justify-center space-x-1">
-                    <div class="w-3 h-3 rounded-full {isActive ? 'bg-red-500' : 'bg-gray-500'} flex-shrink-0"></div>
+                    <div class="w-3 h-3 rounded-full {isActive ? `${flag['color'] || 'bg-red-500'}` : 'bg-gray-500'} flex-shrink-0"></div>
                     <span class="text-xs text-gray-300">{flag.label}</span>
                 </div>
             {/each}
@@ -264,7 +264,6 @@
                                         <div
                                             class="h-2 rounded-full {getVoltageStatusColor(
                                                 cellv,
-                                                [2, 5]
                                             )}"
                                             style="width: {getVoltageProgressWidth(cellv)}%"
                                         ></div>

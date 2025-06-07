@@ -88,7 +88,7 @@
         { name: 'Motor', path: '/motor', icon: '⚙️' },
         { name: 'Solar', path: '/solar', icon: '☀️' },
         { name: 'Strategy', path: '/strategy', icon: '📋' },
-        { name: 'Temperature', path: '/temperature', icon: '🌡️' }
+        { name: 'System Status', path: '/system_status', icon: '🚨' }
     ];
     
     import { page } from '$app/stores'

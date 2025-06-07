@@ -385,7 +385,7 @@
 
         <div class="metric-card">
             <div class="metric-value text-purple-400">
-                {formatValue($globalStore.historic.Acceleration[-1], "m/s²")}
+                {formatValue($globalStore.historic.Acceleration[-1] || 0, "m/s²")}
             </div>
             <div class="metric-label">Current Acceleration</div>
         </div>

@@ -40,19 +40,18 @@ MOTOR_LIMIT_NAMES = (
     'ipm_temp_limit', 'bus_voltage_lower_limit',
     'bus_voltage_upper_limit', 'bus_current_limit',
     'velocity_limit', 'motor_current_limit',
-    'output_voltage_pwm_limit'
+    'output_voltage_pwm_limit',
 )
 MOTOR_ERROR_NAMES = (
-    'motor_over_speed', 'desaturation_fault', 'rail_15v_uvlo',
-    'config_read_error', 'watchdog_reset', 'bad_motor_position',
-    'dc_bus_over_voltage', 'software_over_current',
-    'hardware_over_current'
+    'hardware_over_current','software_over_current', 'dc_bus_over_voltage', 
+    'bad_motor_position', 'watchdog_reset', 'config_read_error',
+    'rail_15v_uvlo', 'desaturation_fault', 'motor_over_speed', 
 )
-CABIN_FLAG_NAMES = (
+CABIN_FLAG_NAMES = (  ## TODO
     'Cabin_CO_Content', 'Cabin_CH4_Content',
     'Cabin_NH3_Content', 'Cabin_NO2_Content',
     'Cabin_O2_Content', 'Cabin_Temperature',
-    'Cabin_Pressure', 'Cabin_CO2_Content'
+    'Cabin_Pressure', 'Cabin_CO2_Content',
 )
 PACKET_B_DIRECT_KEYS = ("Motor_Temp", "HeatSink_Temp", "DSP_Board_Temp",)
 
@@ -112,6 +111,7 @@ current_data = {
         'Motor_Velocity': 123,
         'Speed2': 75,
         'HeatSink_Temp': 31,
+        'PhaseA_Current': 45.65,
         'PhaseB_Current': 45.6,
         'PhaseC_Current': 45.7,
         'Bus_Voltage': 50,
@@ -180,6 +180,7 @@ current_data = {
         'Bus_Power': [],
         'Motor_Velocity': [],
         'Speed2': [],
+        'PhaseA_Current': [],
         'solar_input_voltage': [],
         'solar_output_power': [],
         'Acceleration': [],
@@ -270,7 +271,7 @@ async def update_processor(queue: asyncio.Queue):
                 mppts = []
                 solar_o = 0
                 solar_i_v = 0
-                for i, old in zip(MPPT_NAMES, current_data['mppts']):
+                for i, old in zip(MPPT_NAMES, current_data['metric']['mppts']):
                     d = {k: pdata[k + f"_{i}"]
                         for k in MPPT_VALUE_KEYS}
                     
@@ -295,24 +296,26 @@ async def update_processor(queue: asyncio.Queue):
                 # Flags
                 metric['precharge_state'] = sum(i * pdata[f'Precharge_State_Flag{i}'] for i in range(1, 6))
                 metric['contactor_flags'] = {
-                    key: pdata[F"Precharge_Driver_Flag{j+1}"]
-                    for j, key in enumerate(BMS_FLAG_NAMES) if key
+                    key: pdata[f"Precharge_Contactor_Flag{j+1}"]
+                    for j, key in enumerate(CONTACTOR_FLAG_NAMRS) if key
                 }
                 metric['bmsFlags'] = {
-                    key: pdata[F"BMS_Flag{j+1}"]
+                    key: pdata[f"BMS_Flag{j+1}"]
                     for j, key in enumerate(BMS_FLAG_NAMES) if key
                 }
                 metric['MotorLimits'] = {
-                    key: pdata[F"MC_Limit_Flag{j+1}"]
+                    key: pdata[f"MC_Limit_Flag{j+1}"]
                     for j, key in enumerate(MOTOR_LIMIT_NAMES) if key          
                 }
                 metric['MotorErrors'] = {
-                    key: pdata[F"MC_Error_Flag{j+1}"]
+                    key: pdata[f"MC_Error_Flag{j+1}"]
                     for j, key in enumerate(MOTOR_ERROR_NAMES) if key          
                 }
 
                 # Derived data
+                metric['PhaseA_Current'] = phase_a_current = (metric['PhaseB_Current'] + metric['PhaseB_Current']) / 2.0
                 metric['power_consumption'] = output_power = pdata['Pack_Voltage'] * pdata['Pack_Current']
+                metric['Bus_Power'] = b_output_power = pdata['Bus_Voltage'] * pdata['Bus_Current']
                 metric['Speed2'] = pdata['Vehicle_Velocity']
                 metric['solar_input'] = solar_o
 
@@ -322,9 +325,11 @@ async def update_processor(queue: asyncio.Queue):
                     'Battery': pdata['SOC_Ah'],
                     'Power': output_power,
                     'Solar': solar_o,
-                    'Bus_Power': output_power,
+                    'Bus_Power': b_output_power,
                     'Motor_Velocity': pdata['Motor_Velocity'],
                     'Speed2': pdata['Vehicle_Velocity'],
+
+                    'PhaseA_Current': phase_a_current,
 
                     'solar_input_voltage': solar_i_v,
                     'solar_output_power': solar_o,
@@ -344,7 +349,7 @@ async def update_processor(queue: asyncio.Queue):
                     metric[k] = pdata[k]
                 
                 mppts = []
-                for i, old in zip(MPPT_NAMES, current_data['mppts']):
+                for i, old in zip(MPPT_NAMES, current_data['metric']['mppts']):
                     mppts.append({
                         **old,
                         'Mosfet_Temperature': pdata[f'Mosfet_Temp_{i}'],

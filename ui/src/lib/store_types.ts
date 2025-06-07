@@ -96,6 +96,7 @@ export interface TelemetryData {
         Motor_Velocity: number;
         Speed2: number;
         HeatSink_Temp: number;
+        PhaseA_Current: number;
         PhaseB_Current: number;
         PhaseC_Current: number;
         Bus_Voltage: number;
@@ -147,6 +148,8 @@ export interface TelemetryData {
         Motor_Velocity: number[];
         Speed2: number[];
 
+        PhaseA_Current: number[];
+
         // Solar
         solar_input_voltage: number[],
         solar_output_power: number[],
@@ -174,6 +177,7 @@ export interface UpdatePacket {
 
         solar_input_voltage: number,
         solar_output_power: number,
+        PhaseA_Current: number,
 
         Acceleration: number,
         Altitude: number,

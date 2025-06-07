@@ -60,6 +60,7 @@ const initialState: TelemetryData = {
         Motor_Velocity: 0,
         Speed2: 0,
         HeatSink_Temp: 0,
+        PhaseA_Current: 0,
         PhaseB_Current: 0,
         PhaseC_Current: 0,
         Bus_Voltage: 0,
@@ -127,6 +128,8 @@ const initialState: TelemetryData = {
         Battery: [],
         Power: [],
         Solar: [],
+
+        PhaseA_Current: [],
 
         // Motor
         // timestamps_motor: [];
