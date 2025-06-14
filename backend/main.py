@@ -9,7 +9,8 @@ from datetime import datetime, timedelta, timezone
 import uvicorn
 from contextlib import asynccontextmanager
 import threading
-import traceback 
+import traceback
+from pprint import pprint 
 
 from downlink import main as run_downlink
 
@@ -217,50 +218,20 @@ manager = ConnectionManager()
 async def update_processor(queue: asyncio.Queue):
     """Background task that waits for data update events and broadcasts"""
     try:
+        count = 0
         while True:
             (ptype, pdata) = await queue.get()
             # await asyncio.sleep(1)
 
-            # ptype = 'A'
-            # pdata = {
-            #     "Timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S"),
-            #     "SOC_Ah": round(random.uniform(0, 200)),  # State of Charge in Ah (0-200Ah range)
-            #     "Pack_Voltage": round(random.uniform(300, 800)),  # High voltage battery pack
-            #     "Pack_Current": round(random.uniform(-200, 200)),  # Can be negative (charging)
-            #     "Bus_Voltage": round(random.uniform(300, 800)),
-            #     "Bus_Current": round(random.uniform(-200, 200)),
-            #     "Motor_Velocity": round(random.uniform(0, 8000)),  # RPM
-            #     "Vehicle_Velocity": round(random.uniform(0, 120)),  # km/h
-            #     "PhaseC_Current": round(random.uniform(-150, 150)),
-            #     "PhaseB_Current": round(random.uniform(-150, 150)),
-            #     "Input_Voltage_A": round(random.uniform(10, 15)),
-            #     "Input_Current_A": round(random.uniform(0, 30)),
-            #     "Output_Voltage_A": round(random.uniform(10, 15)),
-            #     "Output_Current_A": round(random.uniform(0, 30)),
-            #     "Input_Voltage_B": round(random.uniform(10, 15)),
-            #     "Input_Current_B": round(random.uniform(0, 30)),
-            #     "Output_Voltage_B": round(random.uniform(10, 15)),
-            #     "Output_Current_B": round(random.uniform(0, 30)),
-            #     "Input_Voltage_C": round(random.uniform(10, 15)),
-            #     "Input_Current_C": round(random.uniform(0, 30)),
-            #     "Output_Voltage_C": round(random.uniform(10, 15)),
-            #     "Output_Current_C": round(random.uniform(0, 30)),
-            #     "Input_Voltage_D": round(random.uniform(10, 15)),
-            #     "Input_Current_D": round(random.uniform(0, 30)),
-            #     "Output_Voltage_D": round(random.uniform(10, 15)),
-            #     "Output_Current_D": round(random.uniform(0, 30)),
-            #     "Latitude": round(random.uniform(-90, 90), 6),
-            #     "Longitude": round(random.uniform(-180, 180), 6),
-            #     "Altitude": round(random.uniform(-100, 3000)),  # Meters
-            #     "Speed": round(random.uniform(0, 120)),  # km/h
-            #     "acc_X": round(random.uniform(-2, 2)),  # m/s²
-            #     "acc_Y": round(random.uniform(-2, 2)),
-            #     "acc_Z": round(random.uniform(-2, 2)),
-            #     "Flags": []  # Dictionary of boolean flags
-            # }
-
             update_packet = {"type": "update"}
             metric = current_data['metric']
+            # ptype = 'None'
+            # count += 1
+            # metric['Speed'] = count % 10
+
+            # if(count > 10):
+            #     metric['bmsFlags']['cell_over_voltage'] = True
+            # print( ptype, pdata)
 
             if ptype == "A":
                 # Direct data
@@ -276,10 +247,12 @@ async def update_processor(queue: asyncio.Queue):
                         for k in MPPT_VALUE_KEYS}
                     
                     d['Output_Power'] = ds_o = d['Output_Voltage'] * d['Output_Current']
+                    # d['Output_Power'] = ds_o = d['Input_Voltage'] * d['Input_Current']
                     solar_o +=  ds_o
                     solar_i_v += d['Input_Voltage']
             
-                    d['efficiency'] = ds_o / max(d['Input_Voltage'] * d['Input_Current'], 0.00001)
+                    d['efficiency'] = 100 * ds_o / max(d['Input_Voltage'] * d['Input_Current'], 0.00001)
+                    d['efficiency'] = max(0, d['efficiency'])
 
                     d['Mosfet_Temperature'] = old['Mosfet_Temperature']
                     d['MPPT_Temperature'] = old['MPPT_Temperature']
@@ -353,15 +326,18 @@ async def update_processor(queue: asyncio.Queue):
                     mppts.append({
                         **old,
                         'Mosfet_Temperature': pdata[f'Mosfet_Temp_{i}'],
-                        'MPPT_Temperature': pdata[f'Controller_Temp_{i}'],
+                        'MPPT_Temperature': min(pdata[f'Controller_Temp_{i}'], 100),
                     })
                 metric['mppts'] = mppts
                 
                 metric['cmus'] = []
                 output_power = 0
                 
-                minTemp, maxTemp = float('inf'), -float('inf')
-                minVolt, maxVolt = float('inf'), -float('inf')
+                # minTemp, maxTemp = float('inf'), -float('inf')
+                # minVolt, maxVolt = float('inf'), -float('inf')
+                
+                minTemp, maxTemp = 100, -100
+                minVolt, maxVolt = 100, -100
 
                 for i in range(1, 6):
                     d = {
@@ -393,7 +369,11 @@ async def update_processor(queue: asyncio.Queue):
 
             # Broadcast update =====================================
             print("broadcasting")
-            await manager.broadcast(json.dumps(update_packet))
+            await manager.broadcast(json.dumps(update_packet, default=lambda o: "Infinity" if o == float('inf') 
+                  else "-Infinity" if o == float('-inf') 
+                  else "NaN" if o != o  # NaN check
+                  else None))
+            # pprint(update_packet)
     
     except Exception as e:
         print(f"PRocessor crashed: {e}")

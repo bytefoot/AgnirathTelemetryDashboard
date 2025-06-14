@@ -3,6 +3,8 @@
     import { onMount, onDestroy } from "svelte";
     import { globalStore} from '$lib/store';
     import type {DataPacket, UpdatePacket} from "$lib/store_types.ts"
+    // Import the notification component
+    import NotificationToast from '$lib/components/NotificationToast.svelte';
 
     let { children } = $props();
 
@@ -170,6 +172,15 @@
             </div>
             <div class="flex items-center space-x-4">
                 <div class="text-sm text-gray-400">Live Telemetry Dashboard</div>
+                <!-- Notification Controls -->
+                <button
+                    onclick={() => globalStore.clearNotifications()}
+                    class="flex items-center space-x-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors duration-200 text-sm"
+                    title="Clear All Notifications"
+                >
+                    <span class="text-lg">🔔</span>
+                    <span>Clear Alerts</span>
+                </button>
                 <!-- Fullscreen Toggle Button -->
                 <button
                     onclick={toggleFullscreen}
@@ -219,7 +230,11 @@
         {/if}
         {@render children()}
     </main>
+
+    <!-- Notification Component -->
+    <NotificationToast />
 </div>
+
 <style>
     :global(body) {
         margin: 0;

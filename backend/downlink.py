@@ -1,6 +1,7 @@
 import serial
 import json
 import os
+import csv
 import numpy as np
 
 
@@ -9,6 +10,8 @@ SERIAL_PORT = "/dev/tty.usbserial-0001"
 BAUD_RATE = 115200
 TIMEOUT = 1
 HEADER = b'\xDE\xAD\xBE\xEF'  ## same HEADER as sender ##
+
+logpath = os.path.expanduser("~") + "/Developer/Agnirath/TrackTesting/logs"
 
 
 def generate_crc(byte_stream: bytes, poly=0x1021, init_val=0x0000):
@@ -118,13 +121,39 @@ def reverse_bytestream(data_bytes: bytes, output_order: list[str], fields: dict,
     return data_buf
 
 
-def log_data(data_buf, filename="output_data1.jsonl"):
-    # Convert numpy scalars to Python native types ####################### temp fix #####TODO: fix this
-    clean_data = {k: (v.item() if hasattr(v, 'item') else v) for k, v in data_buf.items()}
-    with open(filename, "a") as f:
-        json_line = json.dumps(clean_data)
-        f.write(json_line + "\n")
+# def log_data(data_buf, filename="output_data1.jsonl"):
+#     # Convert numpy scalars to Python native types ####################### temp fix #####TODO: fix this
+#     clean_data = {k: (v.item() if hasattr(v, 'item') else v) for k, v in data_buf.items()}
+#     with open(filename, "a") as f:
+#         json_line = json.dumps(clean_data)
+#         f.write(json_line + "\n")
 
+def log_data(data_buf, type):
+    # Convert numpy scalars to Python native types
+    clean_data = {k: (v.item() if hasattr(v, 'item') else v) for k, v in data_buf.items()}
+    filename=f"{logpath}/output_data_{type}.csv"
+    
+    # Check if file exists and has content
+    file_exists = os.path.isfile(filename)
+    file_empty = not file_exists or os.path.getsize(filename) == 0
+    
+    # Get existing headers or use current keys
+    if file_exists and not file_empty:
+        with open(filename, 'r', newline='') as f:
+            reader = csv.reader(f)
+            headers = next(reader)  # Read existing header
+    else:
+        headers = list(clean_data.keys())  # Use current keys as header
+    
+    # Prepare row data matching header order
+    row_data = [clean_data.get(header, '') for header in headers]
+    
+    with open(filename, 'a', newline='') as f:
+        writer = csv.writer(f)
+        # Write header only for new/empty files
+        if file_empty:
+            writer.writerow(headers)
+        writer.writerow(row_data)
 
 def main(queue, loop):
     ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=TIMEOUT)
@@ -162,7 +191,7 @@ def main(queue, loop):
         data_buf = reverse_bytestream(packet['data'], output_order, fields, flags, type_map)
         loop.call_soon_threadsafe(queue.put_nowait, (packet['type'], data_buf))
 
-        log_data(data_buf)
+        log_data(data_buf, packet['type'])
         print("logged data!!", data_buf.get('Precharge_State_Flag3', "no"))
 
 

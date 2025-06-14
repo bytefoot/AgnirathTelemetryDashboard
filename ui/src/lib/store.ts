@@ -37,7 +37,6 @@ const initialState: TelemetryData = {
             contactor1_output: false,
             contactor2_output: false,
             contactor3_output: false,
-
             contactor_supply: false,
         },
         bmsFlags: {
@@ -132,7 +131,6 @@ const initialState: TelemetryData = {
         PhaseA_Current: [],
 
         // Motor
-        // timestamps_motor: [];
         Bus_Power: [],
         Motor_Velocity: [],
         Speed2: [],
@@ -147,12 +145,49 @@ const initialState: TelemetryData = {
     }
 };
 
+// Notification store
+export interface BMSNotification {
+    id: string;
+    flagName: string;
+    message: string;
+    timestamp: Date;
+    severity: 'error' | 'warning' | 'info';
+}
+
+const notificationsStore = writable<BMSNotification[]>([]);
+
+// Helper function to format flag names for display
+function formatFlagName(flagName: string): string {
+    return flagName
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
+// Helper function to determine severity based on flag name
+function getFlagSeverity(flagName: string): 'error' | 'warning' | 'info' {
+    const errorFlags = [
+        'cell_over_voltage', 'cell_under_voltage', 'cell_over_temp',
+        'isolation_test_fail', 'extra_cell_detected'
+    ];
+    const warningFlags = [
+        'measurement_untrusted', 'cmu_comm_timeout', 'vehicle_comm_timeout',
+        'soc_invalid', 'can_supply_low', 'contactor_not_engaged'
+    ];
+    
+    if (errorFlags.includes(flagName)) return 'error';
+    if (warningFlags.includes(flagName)) return 'warning';
+    return 'info';
+}
+
 // Create the store with type-safe methods
 function createStore() {
     const { subscribe, set, update } = writable<TelemetryData>(initialState);
 
     return {
         subscribe,
+        notifications: notificationsStore,
+        
         // Update a single value
         updateValue: <K extends keyof TelemetryData['metric']>(
             key: K, 
@@ -161,6 +196,7 @@ function createStore() {
             state.metric[key] = value;
             return state;
         }),
+        
         // Append to an array
         appendToArray: <K extends keyof TelemetryData['historic']>(
             key: K,
@@ -177,19 +213,78 @@ function createStore() {
     
         reset: () => set(initialState),
 
+        // Add notification
+        addNotification: (notification: Omit<BMSNotification, 'id' | 'timestamp'>) => {
+            const newNotification: BMSNotification = {
+                ...notification,
+                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                timestamp: new Date()
+            };
+            
+            notificationsStore.update(notifications => {
+                // Add new notification and keep only last 50
+                const updated = [newNotification, ...notifications].slice(0, 50);
+                return updated;
+            });
+        },
+
+        // Remove notification
+        removeNotification: (id: string) => {
+            notificationsStore.update(notifications => 
+                notifications.filter(n => n.id !== id)
+            );
+        },
+
+        // Clear all notifications
+        clearNotifications: () => {
+            notificationsStore.set([]);
+        },
+
         handleWebSocketUpdate: (message: UpdatePacket) => {
             try {
                 update(state => {
                     const newState = { ...state };
         
                     if (message.metric) {
-                        // Type-safe iteration
+                        // Check for BMS flag changes before updating
+                        if (message.metric.bmsFlags && newState.metric.bmsFlags) {
+                            Object.keys(message.metric.bmsFlags).forEach(flagKey => {
+                                const oldValue = newState.metric.bmsFlags[flagKey];
+                                const newValue = message.metric.bmsFlags![flagKey];
+                                
+                                // If flag changed from false to true, create notification
+                                if (!oldValue && newValue) {
+                                    const formattedName = formatFlagName(flagKey);
+                                    const severity = getFlagSeverity(flagKey);
+                                    
+                                    // Add notification using the store method
+                                    setTimeout(() => {
+                                        globalStore.addNotification({
+                                            flagName: flagKey,
+                                            message: `BMS Alert: ${formattedName} flag activated`,
+                                            severity
+                                        });
+                                    }, 0);
+
+                                    // Send push notification via ntfy.sh
+                                    fetch('https://ntfy.sh/agnirath_telemtry', {
+                                        method: 'POST',
+                                        body: `🚨 Agnirath BMS Alert: ${formattedName} flag activated`
+                                    }).catch(error => {
+                                        console.warn('Failed to send push notification:', error);
+                                    });
+                                }
+                            });
+                        }
+
+                        // Type-safe iteration for all metric updates
                         (Object.keys(message.metric) as Array<keyof TelemetryData['metric']>).forEach(key => {
                             if (message.metric && key in newState.metric) {
                                 newState.metric[key] = (message.metric[key]! as any);
                             }
                         });
                     }
+                    
                     if (message.historic) {
                         // Type-safe iteration
                         (Object.keys(message.historic) as Array<keyof TelemetryData['historic']>).forEach(key => {
@@ -246,7 +341,6 @@ function createStore() {
             }
         },
     };
-
 }
 
 export const globalStore = createStore();
