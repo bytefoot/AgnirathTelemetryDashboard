@@ -183,3 +183,5 @@ public/
 .DS_Store
 
 output_data1.jsonl
+
+log/

@@ -1,5 +1,9 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
+
 import asyncio
 import json
 import time
@@ -308,7 +312,7 @@ async def update_processor(queue: asyncio.Queue):
                     'solar_output_power': solar_o,
 
                     'Altitude': pdata['Altitude'],
-                    'Acceleration': math.sqrt(sum(pdata[f'acc_{i}']**2 for i in ('X', 'Y', 'Z'))),
+                    'Acceleration': math.sqrt(sum(pdata[f'acc_{i}']**2 for i in ('X', 'Y'))),
                 }
 
                 for k in current_data['historic']:
@@ -406,6 +410,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Telemetry Dashboard API", lifespan=lifespan)
 
+# Path to Svelte build output
+frontend_dir = os.path.join(os.path.dirname(__file__), "prodbuild")
+
+# Serve static assets
+app.mount("/_app", StaticFiles(directory=os.path.join(frontend_dir, "_app")), name="_app")
+app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dir, "assets")), name="assets")
+
 # Enable CORS for Svelte frontend
 app.add_middleware(
     CORSMiddleware,
@@ -417,7 +428,12 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Telemetry Dashboard API", "docs": "/docs"}
+    return FileResponse(os.path.join(frontend_dir, "index.html"))
+
+# Catch-all for client-side routing
+@app.get("/{full_path:path}")
+async def spa_catch_all(full_path: str):
+    return FileResponse(os.path.join(frontend_dir, "index.html"))
 
 # API Routes
 @app.get("/api/data/historical")
