@@ -410,12 +410,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Telemetry Dashboard API", lifespan=lifespan)
 
-# Path to Svelte build output
-frontend_dir = os.path.join(os.path.dirname(__file__), "prodbuild")
+# # Path to Svelte build output
+# frontend_dir = os.path.join(os.path.dirname(__file__), "prodbuild")
 
-# Serve static assets
-app.mount("/_app", StaticFiles(directory=os.path.join(frontend_dir, "_app")), name="_app")
-app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dir, "assets")), name="assets")
+# # Serve static assets
+# app.mount("/_app", StaticFiles(directory=os.path.join(frontend_dir, "_app")), name="_app")
+# app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dir, "assets")), name="assets")
 
 # Enable CORS for Svelte frontend
 app.add_middleware(
@@ -426,14 +426,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-async def root():
-    return FileResponse(os.path.join(frontend_dir, "index.html"))
+# @app.get("/")
+# async def root():
+#     return FileResponse(os.path.join(frontend_dir, "index.html"))
 
-# Catch-all for client-side routing
-@app.get("/{full_path:path}")
-async def spa_catch_all(full_path: str):
-    return FileResponse(os.path.join(frontend_dir, "index.html"))
+# # Catch-all for client-side routing
+# @app.get("/{full_path:path}")
+# async def spa_catch_all(full_path: str):
+#     return FileResponse(os.path.join(frontend_dir, "index.html"))
 
 # API Routes
 @app.get("/api/data/historical")

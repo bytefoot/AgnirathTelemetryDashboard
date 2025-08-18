@@ -11,7 +11,7 @@ BAUD_RATE = 115200
 TIMEOUT = 1
 HEADER = b'\xDE\xAD\xBE\xEF'  ## same HEADER as sender ##
 
-logpath = os.path.expanduser("~") + "/Developer/Agnirath/TrackTesting/logs"
+logpath = "/Users/kevinkinsey/Developer/Agnirath/d2/log"
 
 
 def generate_crc(byte_stream: bytes, poly=0x1021, init_val=0x0000):
