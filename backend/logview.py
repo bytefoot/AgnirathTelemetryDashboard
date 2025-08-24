@@ -8,8 +8,10 @@ st.set_page_config(layout="wide")
 st.title("Interactive CSV Log Viewer 📊")
 st.write("This viewer updates automatically every 2 seconds.")
 
+logpath = "/Users/kevinkinsey/Developer/Agnirath/d2/log_aug22_track"
 logpath = "/Users/kevinkinsey/Developer/Agnirath/d2/log"
 logfile = os.path.join(logpath, "output_data_A.csv")
+# logfile = "/Users/kevinkinsey/Developer/Agnirath/TrackTesting/afterlogs/output_data_A.csv"
 
 # --- Set up the automatic refresh ---
 # Refresh the app every 2000 milliseconds (2 seconds)
@@ -20,7 +22,7 @@ if not os.path.exists(logfile):
     st.warning("Waiting for the log file to be created...")
 else:
     try:
-        # Read the CSV file directly, no need for caching here
+        # Read the CSV file directly, no need for caching herexxxxx
         df = pd.read_csv(logfile)
 
         # Sort the data by its index in reverse order

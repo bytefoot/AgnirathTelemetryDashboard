@@ -14,7 +14,8 @@ st.title("Interactive Solar Vehicle Data Dashboard")
 
 # 1. Read the data from a CSV file
 try:
-    logpath = "/Users/kevinkinsey/Developer/Agnirath/d2/log_17aug_track"
+    # logpath = "/Users/kevinkinsey/Developer/Agnirath/HiddenValleyLogs/log_17aug_8"
+    logpath = "/Users/kevinkinsey/Developer/Agnirath/d2/log"
     logfile = os.path.join(logpath, "output_data_A.csv")
     df = pd.read_csv(logfile)
 except FileNotFoundError:

@@ -253,22 +253,39 @@
                     {#if cmu.cell_voltages && cmu.cell_voltages.length > 0}
                         <div class="grid grid-cols-8 gap-3">
                             {#each cmu.cell_voltages as cellv, cellIndex}
-                                <div class="bg-gray-600 rounded p-3 text-center">
-                                    <div class="text-xs text-gray-400 mb-1">
-                                        Cell {cellIndex}
-                                    </div>
-                                    <div class="text-sm font-medium mb-2">
-                                        {formatValue(cellv, "V", 3)}
-                                    </div>
-                                    <div class="w-full h-2 rounded-full bg-gray-500">
-                                        <div
+                                {#if cellv < 10 }
+                                    <div class="bg-gray-600 rounded p-3 text-center">
+                                        <div class="text-xs text-gray-400 mb-1">
+                                            Cell {cellIndex}
+                                        </div>
+                                        <div class="text-sm font-medium mb-2">
+                                            {formatValue(cellv, "V", 3)}
+                                        </div>
+                                        <div class="w-full h-2 rounded-full bg-gray-500">
+                                            <div
                                             class="h-2 rounded-full {getVoltageStatusColor(
                                                 cellv,
                                             )}"
-                                            style="width: {getVoltageProgressWidth(cellv)}%"
-                                        ></div>
+                                                style="width: {getVoltageProgressWidth(cellv)}%"
+                                            ></div>
+                                        </div>
                                     </div>
-                                </div>
+                                {:else}
+                                    <div class="bg-gray-600 rounded p-3 text-center">
+                                        <div class="text-xs text-gray-400 mb-1">
+                                            Cell {cellIndex}
+                                        </div>
+                                        <div class="text-sm font-medium mb-2">
+                                            {"-"}
+                                        </div>
+                                        <div class="w-full h-2 rounded-full bg-gray-500">
+                                            <div
+                                            class="h-2 rounded-full bg-gray-500"
+                                                style="width: {getVoltageProgressWidth(4.2)}%"
+                                            ></div>
+                                        </div>
+                                    </div>
+                                {/if}
                             {/each}
                         </div>
                     {:else}

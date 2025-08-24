@@ -87,6 +87,7 @@ def unpack_flags(flag_bytes: bytes, total_bits: int, flags_list: list[str]) -> d
 
     flag_values = {}
     for i, flag_key in enumerate(flags_list):
+        # print(bits, len(bits), i, flag_key)
         flag_values[flag_key] = bits[i]
     return flag_values
 
@@ -174,25 +175,46 @@ def main(queue, loop):
         "bool": bool
     }
 
+    sym = ('*', '#')
+    i = 0
+
     while True:
         packet = read_packet(ser)
         if packet is None:
             continue
-        print(f"Received packet type: {packet['type']} data length: {len(packet['data'])}")
+        print(f"[{sym[i]}] Received packet type: {packet['type']} data length: {len(packet['data'])}")
+        i = (i + 1) % 2
+
+        data_buf = None
         
         if packet['type'] == 'A':
-            output_order = structure['Output_Order_A']
+            data_buf = reverse_bytestream(
+                packet['data'], structure['Output_Order_A'],
+                fields, flags, type_map
+            )
+
+            net_solar_power = 0
+            for l in ('A', 'B', 'C', 'D'):
+                data_buf[f'Power_{l}'] = data_buf[f'Output_Voltage_{l}'] * data_buf[f'Output_Current_{l}']
+                net_solar_power += data_buf[f'Power_{l}']
+            data_buf[f'Solar_Power'] = net_solar_power
+
+            data_buf['Bus_Power'] = data_buf['Bus_Voltage'] * data_buf['Bus_Current']
+            print(data_buf["Throttle_Perc"])
+
         elif packet['type'] == 'B':
-            output_order = structure['Output_Order_B']
+            data_buf = reverse_bytestream(
+                packet['data'], structure['Output_Order_B'],
+                fields, flags, type_map
+            )
+
         else:
             print(f"Type is {packet['type']}, doesn't match any known type")
             continue
 
-        data_buf = reverse_bytestream(packet['data'], output_order, fields, flags, type_map)
         loop.call_soon_threadsafe(queue.put_nowait, (packet['type'], data_buf))
 
         log_data(data_buf, packet['type'])
-        print("logged data!!", data_buf.get('Precharge_State_Flag3', "no"))
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@
     let reconnectInterval: number | null = null;
 
     // Backend configuration
-    const API_BASE_URL = 'http://localhost:8000';
+    // const WS_URL = 'ws://192.168.1.232:8000/ws/updates';
     const WS_URL = 'ws://localhost:8000/ws/updates';
     let connected = $state(false);
 

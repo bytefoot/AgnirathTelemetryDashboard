@@ -244,10 +244,10 @@
                     <div class="stat-value text-yellow-400">{formatValue(totalPower, 'W', 0)}</div>
                     <div class="stat-label">Total Power</div>
                 </div>
-                <div class="stat-item">
+                <!-- <div class="stat-item">
                     <div class="stat-value text-green-400">{formatValue(avgEfficiency, '%')}</div>
                     <div class="stat-label">Avg Efficiency</div>
-                </div>
+                </div> -->
                 <div class="stat-item">
                     <div class="stat-value text-blue-400">N/A</div>
                     <div class="stat-label">Active Units</div>

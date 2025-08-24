@@ -142,6 +142,8 @@ const initialState: TelemetryData = {
         // Strategy
         Acceleration: [],
         Altitude: [],
+        Latitudes: [],
+        Longitudes: [],
     }
 };
 

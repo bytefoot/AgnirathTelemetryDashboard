@@ -25,9 +25,11 @@ PACKET_A_DIRECT_KEYS = ("SOC_Ah", "Pack_Voltage", "Pack_Current", "Bus_Voltage",
 MPPT_NAMES = ('A', 'B', 'C', 'D')
 MPPT_VALUE_KEYS = ("Input_Voltage", "Input_Current",
                         "Output_Voltage", "Output_Current")
-MPPT_FLAG_NAMES = ('hw_overvolt', 'hw_overcurrent', 'under12v', None,
-                     'low_array_power', 'battery_full', 'battery_low',
-                     'mosfet_overheat', )
+MPPT_FLAG_NAMES = (
+    'hw_overvolt', 'hw_overcurrent', None, 'under12v',
+    'battery_full', 'battery_low',
+    'mosfet_overheat', 'low_array_power'
+)
 CONTACTOR_FLAG_NAMRS = (
     'contactor1_error', 'contactor2_error',
     'contactor1_output', 'contactor2_output',
@@ -190,6 +192,8 @@ current_data = {
         'solar_output_power': [],
         'Acceleration': [],
         'Altitude': [],
+        'Latitudes': [-12.446822],
+        'Longitudes': [130.907036],
     }
 }
 
@@ -249,6 +253,10 @@ async def update_processor(queue: asyncio.Queue):
                 for i, old in zip(MPPT_NAMES, current_data['metric']['mppts']):
                     d = {k: pdata[k + f"_{i}"]
                         for k in MPPT_VALUE_KEYS}
+                    
+                    # Immeditate bugfix
+                    # if(d['Input_Voltage'] < 0):
+                    #     d['Input_Voltage'] = old['Input_Voltage']
                     
                     d['Output_Power'] = ds_o = d['Output_Voltage'] * d['Output_Current']
                     # d['Output_Power'] = ds_o = d['Input_Voltage'] * d['Input_Current']
@@ -313,6 +321,8 @@ async def update_processor(queue: asyncio.Queue):
 
                     'Altitude': pdata['Altitude'],
                     'Acceleration': math.sqrt(sum(pdata[f'acc_{i}']**2 for i in ('X', 'Y'))),
+                    'Latitudes': pdata['Latitude'],
+                    'Longitudes': pdata['Longitude'],
                 }
 
                 for k in current_data['historic']:
@@ -420,7 +430,7 @@ app = FastAPI(title="Telemetry Dashboard API", lifespan=lifespan)
 # Enable CORS for Svelte frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Add your Svelte dev server ports
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://192.168.1.232:5173/"],  # Add your Svelte dev server ports
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

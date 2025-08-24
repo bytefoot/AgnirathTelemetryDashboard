@@ -26,7 +26,7 @@
         Legend
     );
 
-    const speed_margin = $derived(Math.abs($globalStore.metric.Speed - $globalStore.metric.predicted));
+    const speed_margin = $derived(Math.abs($globalStore.metric.Speed2 - $globalStore.metric.predicted));
     const speed_status = $derived(speed_margin > 3 ? 'error' : 'ok');
 
     // Canvas element references
@@ -126,7 +126,7 @@
 
         if (speedChart) {
             speedChart.data.labels = $globalStore.historic.Timestamps;
-            speedChart.data.datasets[0].data = $globalStore.historic.Speed;
+            speedChart.data.datasets[0].data = $globalStore.historic.Speed2;
             speedChart.update("none");
         }
 
@@ -163,7 +163,7 @@
                 speedCanvas,
                 createChartConfig(
                     "Speed",
-                    $globalStore.historic.Speed,
+                    $globalStore.historic.Speed2,
                     "#3b82f6",
                     "Speed (km/h)"
                 )
@@ -233,7 +233,7 @@
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <div class="metric-value text-blue-400">
-                        {formatValue($globalStore.metric.Speed, "km/h")}
+                        {formatValue($globalStore.metric.Speed2, "km/h")}
                     </div>
                     <div class="metric-label">Current Speed</div>
                 </div>
@@ -277,7 +277,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="metric-card">
             <div class="metric-value text-red-400">
-                {formatValue($globalStore.metric.power_consumption, "W", 0)}
+                {formatValue($globalStore.metric.Bus_Power, "W", 0)}
             </div>
             <div class="metric-label">Power Consumption</div>
         </div>

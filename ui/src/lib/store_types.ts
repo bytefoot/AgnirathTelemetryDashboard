@@ -151,12 +151,14 @@ export interface TelemetryData {
         PhaseA_Current: number[];
 
         // Solar
-        solar_input_voltage: number[],
-        solar_output_power: number[],
+        solar_input_voltage: number[];
+        solar_output_power: number[];
 
         // Strategy
-        Acceleration: number[],
-        Altitude: number[],
+        Acceleration: number[];
+        Altitude: number[];
+        Latitudes: number[];
+        Longitudes: number[];
     };
 }
 
@@ -181,6 +183,8 @@ export interface UpdatePacket {
 
         Acceleration: number,
         Altitude: number,
+        Latitudes: number;
+        Longitudes: number;
     };
 }
 

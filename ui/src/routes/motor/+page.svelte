@@ -378,6 +378,10 @@
         <canvas bind:this={busPowerCanvas} class="w-full h-80"></canvas>
     </div>
 
+    <div class="plot-container">
+        <canvas bind:this={speedCanvas} class="w-full h-80"></canvas>
+    </div>
+
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div class="plot-container">
             <canvas bind:this={phaseACanvas} class="w-full h-80"></canvas>
@@ -386,10 +390,6 @@
         <div class="plot-container">
             <canvas bind:this={rpmCanvas} class="w-full h-80"></canvas>
         </div>
-    </div>
-
-    <div class="plot-container">
-        <canvas bind:this={speedCanvas} class="w-full h-80"></canvas>
     </div>
 
     <!-- Motor Efficiency Calculation -->
